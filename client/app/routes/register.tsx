@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router";
 import type { Route } from "./+types/register";
 import { apiUrl } from "../utils/api";
+import { isAuthenticated, persistAuth } from "../utils/auth";
 
 interface RegistrationFormData {
   name: string;
@@ -48,6 +49,12 @@ export default function Register() {
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -124,7 +131,15 @@ export default function Register() {
       }
 
       const data = (await response.json()) as AuthResponsePayload;
-      setSuccessMessage(data.message || "Registration successful. Redirecting to your dashboard...");
+      persistAuth({
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+      });
+      setSuccessMessage(
+        data.message || "Registration successful. Redirecting to your dashboard..."
+      );
 
       // Optionally clear the form before navigating
       setFormData({
@@ -135,7 +150,7 @@ export default function Register() {
       });
 
       // Navigate to the dashboard after successful registration
-      navigate("/dashboard");
+      navigate("/dashboard", { replace: true });
     } catch (error) {
       setErrorMessage("Network error. Please check your connection and try again.");
     } finally {

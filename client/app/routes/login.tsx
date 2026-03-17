@@ -1,7 +1,16 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { useEffect, useState } from "react";
+import { useNavigate, Link, useLocation } from "react-router";
 import type { Route } from "./+types/login";
 import { apiUrl } from "../utils/api";
+import { isAuthenticated, persistAuth } from "../utils/auth";
+
+interface AuthResponsePayload {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  message: string;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -15,6 +24,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
+
+  const redirectPath =
+    location.state &&
+    typeof location.state === "object" &&
+    "from" in location.state &&
+    typeof location.state.from === "string"
+      ? location.state.from
+      : "/dashboard";
 
   const validate = () => {
     let message: string | null = null;
@@ -52,7 +76,14 @@ export default function LoginPage() {
         return;
       }
 
-      navigate("/dashboard");
+      const data = (await response.json()) as AuthResponsePayload;
+      persistAuth({
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+      });
+      navigate(redirectPath, { replace: true });
     } catch {
       setError("Network error. Please check your connection and try again.");
     }
