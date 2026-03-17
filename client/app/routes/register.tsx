@@ -3,17 +3,14 @@ import { useNavigate, Link } from "react-router";
 import type { Route } from "./+types/register";
 
 interface RegistrationFormData {
-  firstName: string;
-  lastName: string;
+  name: string;
   email: string;
   password: string;
   confirmPassword: string;
-  mobilityPreferences: string;
 }
 
 interface FormErrors {
-  firstName?: string;
-  lastName?: string;
+  name?: string;
   email?: string;
   password?: string;
   confirmPassword?: string;
@@ -32,12 +29,10 @@ export function meta({}: Route.MetaArgs) {
 export default function Register() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegistrationFormData>({
-    firstName: "",
-    lastName: "",
+    name: "",
     email: "",
     password: "",
     confirmPassword: "",
-    mobilityPreferences: "",
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -58,12 +53,8 @@ export default function Register() {
   const validate = (): boolean => {
     const newErrors: FormErrors = {};
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = "First name is required.";
-    }
-
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = "Last name is required.";
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required.";
     }
 
     if (!formData.email.trim()) {
@@ -74,8 +65,8 @@ export default function Register() {
 
     if (!formData.password) {
       newErrors.password = "Password is required.";
-    } else if (formData.password.length < 8) {
-      newErrors.password = "Password must be at least 8 characters.";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters.";
     }
 
     if (!formData.confirmPassword) {
@@ -103,11 +94,9 @@ export default function Register() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
+          name: formData.name.trim(),
           email: formData.email.trim(),
           password: formData.password,
-          mobilityPreferences: formData.mobilityPreferences.trim(),
         }),
       });
 
@@ -129,12 +118,10 @@ export default function Register() {
 
       // Optionally clear the form before navigating
       setFormData({
-        firstName: "",
-        lastName: "",
+        name: "",
         email: "",
         password: "",
         confirmPassword: "",
-        mobilityPreferences: "",
       });
 
       // Navigate to the dashboard after successful registration
@@ -172,48 +159,25 @@ export default function Register() {
         )}
 
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="firstName"
-                className="block text-sm font-medium text-gray-700"
-              >
-                First name
-              </label>
-              <input
-                id="firstName"
-                name="firstName"
-                type="text"
-                autoComplete="given-name"
-                value={formData.firstName}
-                onChange={handleChange}
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-              />
-              {errors.firstName && (
-                <p className="text-xs text-red-500">{errors.firstName}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="lastName"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Last name
-              </label>
-              <input
-                id="lastName"
-                name="lastName"
-                type="text"
-                autoComplete="family-name"
-                value={formData.lastName}
-                onChange={handleChange}
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-              />
-              {errors.lastName && (
-                <p className="text-xs text-red-500">{errors.lastName}</p>
-              )}
-            </div>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Full name
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            {errors.name && (
+              <p className="text-xs text-red-500">{errors.name}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -279,27 +243,6 @@ export default function Register() {
                 <p className="text-xs text-red-500">{errors.confirmPassword}</p>
               )}
             </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <label
-              htmlFor="mobilityPreferences"
-              className="block text-sm font-medium text-gray-700"
-            >
-              Mobility preferences
-            </label>
-            <textarea
-              id="mobilityPreferences"
-              name="mobilityPreferences"
-              rows={3}
-              value={formData.mobilityPreferences}
-              onChange={handleChange}
-              placeholder="Describe any mobility aids, accessibility needs, or preferences (e.g., wheelchair access, reduced walking distance)."
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
-            />
-            <p className="text-xs text-gray-500">
-              This helps us better tailor services to your mobility needs.
-            </p>
           </div>
 
           <button

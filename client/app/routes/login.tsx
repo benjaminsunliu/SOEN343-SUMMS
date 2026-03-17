@@ -30,20 +30,31 @@ export default function LoginPage() {
     event.preventDefault();
     if (!validate()) return;
 
-    // Call authentication API; for this assignment we ignore the
-    // actual response and navigate on submit so the UI is testable
-    // even without a running backend.
     try {
-      await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-    } catch {
-      // Ignore network errors for now.
-    }
 
-    navigate("/dashboard");
+      if (!response.ok) {
+        let message = "Login failed. Please try again.";
+        try {
+          const data = await response.json();
+          if (data && typeof data.message === "string") {
+            message = data.message;
+          }
+        } catch (_) {
+          // Ignore JSON parse errors
+        }
+        setError(message);
+        return;
+      }
+
+      navigate("/dashboard");
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    }
   };
 
 
