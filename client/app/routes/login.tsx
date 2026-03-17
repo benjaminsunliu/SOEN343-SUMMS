@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import type { Route } from "./+types/login";
+import { apiUrl } from "../utils/api";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -31,7 +32,7 @@ export default function LoginPage() {
     if (!validate()) return;
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch(apiUrl("/api/auth/login"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim(), password }),
@@ -56,7 +57,6 @@ export default function LoginPage() {
       setError("Network error. Please check your connection and try again.");
     }
   };
-
 
   return (
     <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-white px-4">

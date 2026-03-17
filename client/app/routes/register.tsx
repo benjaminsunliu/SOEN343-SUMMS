@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import type { Route } from "./+types/register";
+import { apiUrl } from "../utils/api";
 
 interface RegistrationFormData {
   name: string;
@@ -14,6 +15,14 @@ interface FormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
+}
+
+interface AuthResponsePayload {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  message: string;
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -88,7 +97,7 @@ export default function Register() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch("/api/auth/register", {
+      const response = await fetch(apiUrl("/api/auth/register"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -114,7 +123,8 @@ export default function Register() {
         return;
       }
 
-      setSuccessMessage("Registration successful. Redirecting to your dashboard...");
+      const data = (await response.json()) as AuthResponsePayload;
+      setSuccessMessage(data.message || "Registration successful. Redirecting to your dashboard...");
 
       // Optionally clear the form before navigating
       setFormData({
