@@ -10,6 +10,19 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: rootpassword
+          MYSQL_DATABASE: summs_db
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -prootpassword"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
 
     defaults:
       run:
@@ -25,6 +38,19 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Wait for MySQL
+        run: |
+          for i in {1..30}; do
+            if (echo > /dev/tcp/127.0.0.1/3307) >/dev/null 2>&1; then
+              echo "MySQL is accepting connections"
+              exit 0
+            fi
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+          echo "MySQL did not start in time"
+          exit 1
 
       - name: Build and run tests
         run: ./mvnw clean verify
