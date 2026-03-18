@@ -23,13 +23,17 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     if (isAuthenticated()) {
       navigate("/dashboard", { replace: true });
+      return;
     }
+
+    setAuthResolved(true);
   }, [navigate]);
 
   const redirectPath =
@@ -88,6 +92,10 @@ export default function LoginPage() {
       setError("Network error. Please check your connection and try again.");
     }
   };
+
+  if (!authResolved) {
+    return null;
+  }
 
   return (
     <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-white px-4">
