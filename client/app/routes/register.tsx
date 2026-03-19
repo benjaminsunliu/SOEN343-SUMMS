@@ -1,0 +1,284 @@
+import { useEffect, useState } from "react";
+import { useNavigate, Link } from "react-router";
+import type { Route } from "./+types/register";
+import { apiUrl } from "../utils/api";
+import { isAuthenticated, persistAuth } from "../utils/auth";
+
+interface RegistrationFormData {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
+interface FormErrors {
+  name?: string;
+  email?: string;
+  password?: string;
+  confirmPassword?: string;
+}
+
+interface AuthResponsePayload {
+  id: number;
+  name: string;
+  email: string;
+  role: string;
+  message: string;
+}
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "Register | SUMMS" },
+    {
+      name: "description",
+      content: "Create your SUMMS account and set mobility preferences.",
+    },
+  ];
+}
+
+export default function Register() {
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState<RegistrationFormData>({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
+
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = event.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: undefined }));
+    setErrorMessage(null);
+    setSuccessMessage(null);
+  };
+
+  const validate = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Name is required.";
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!formData.password) {
+      newErrors.password = "Password is required.";
+    } else if (formData.password.length < 6) {
+      newErrors.password = "Password must be at least 6 characters.";
+    }
+
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password.";
+    } else if (formData.confirmPassword !== formData.password) {
+      newErrors.confirmPassword = "Passwords do not match.";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!validate()) return;
+
+    setSubmitting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    try {
+      const response = await fetch(apiUrl("/api/auth/register"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+        }),
+      });
+
+      if (!response.ok) {
+        let message = "Registration failed. Please try again.";
+        try {
+          const data = await response.json();
+          if (data && typeof data.message === "string") {
+            message = data.message;
+          }
+        } catch (_) {
+          // ignore JSON parse errors
+        }
+        setErrorMessage(message);
+        return;
+      }
+
+      const data = (await response.json()) as AuthResponsePayload;
+      persistAuth({
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        role: data.role,
+      });
+      setSuccessMessage(
+        data.message || "Registration successful. Redirecting to your dashboard..."
+      );
+
+      // Optionally clear the form before navigating
+      setFormData({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+      });
+
+      // Navigate to the dashboard after successful registration
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setErrorMessage("Network error. Please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
+  return (
+    <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-white px-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-md border border-gray-200 p-8 space-y-6">
+        <header className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+            Create your account
+          </h1>
+          <p className="text-sm text-gray-600">
+            Register to SUMMS and tell us about your mobility preferences.
+          </p>
+        </header>
+
+        {successMessage && (
+          <div className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
+            {successMessage}
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
+            {errorMessage}
+          </div>
+        )}
+
+        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="name"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Full name
+            </label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              autoComplete="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            {errors.name && (
+              <p className="text-xs text-red-500">{errors.name}</p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Email
+            </label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              value={formData.email}
+              onChange={handleChange}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            />
+            {errors.email && (
+              <p className="text-xs text-red-500">{errors.email}</p>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label
+                htmlFor="password"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                value={formData.password}
+                onChange={handleChange}
+                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              />
+              {errors.password && (
+                <p className="text-xs text-red-500">{errors.password}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label
+                htmlFor="confirmPassword"
+                className="block text-sm font-medium text-gray-700"
+              >
+                Confirm password
+              </label>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                autoComplete="new-password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              />
+              {errors.confirmPassword && (
+                <p className="text-xs text-red-500">{errors.confirmPassword}</p>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {submitting ? "Registering..." : "Register"}
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
