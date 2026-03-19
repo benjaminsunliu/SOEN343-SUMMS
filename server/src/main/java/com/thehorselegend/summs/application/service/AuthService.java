@@ -3,23 +3,40 @@ package com.thehorselegend.summs.application.service;
 import com.thehorselegend.summs.api.dto.AuthResponse;
 import com.thehorselegend.summs.api.dto.LoginRequest;
 import com.thehorselegend.summs.api.dto.RegisterRequest;
+import com.thehorselegend.summs.application.service.auth.strategy.UserRegistrationStrategy;
 import com.thehorselegend.summs.domain.user.User;
-import com.thehorselegend.summs.domain.user.UserFactory;
+import com.thehorselegend.summs.domain.user.UserRole;
+import com.thehorselegend.summs.infrastructure.security.JwtService;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import com.thehorselegend.summs.infrastructure.persistence.UserMapper;
 import com.thehorselegend.summs.infrastructure.persistence.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+
 @Service
 public class AuthService {
 
+    private static final EnumSet<UserRole> SELF_REGISTRABLE_ROLES = EnumSet.of(UserRole.CITIZEN, UserRole.PROVIDER);
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final Map<UserRole, UserRegistrationStrategy> registrationStrategies;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            List<UserRegistrationStrategy> strategyList) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.registrationStrategies = indexStrategies(strategyList);
     }
 
     public AuthResponse register(RegisterRequest request) {
@@ -30,12 +47,13 @@ public class AuthService {
         }
 
         String hashedPassword = passwordEncoder.encode(request.password());
+        UserRole requestedRole = resolveRequestedRole(request.role());
+        UserRegistrationStrategy strategy = resolveStrategy(requestedRole);
 
-        User user = UserFactory.createCitizen(
+        User user = strategy.create(
                 request.name().trim(),
                 normalizedEmail,
-                hashedPassword
-        );
+                hashedPassword);
 
         UserEntity savedEntity = userRepository.save(UserMapper.toEntity(user));
         User savedUser = UserMapper.toDomain(savedEntity);
@@ -45,8 +63,8 @@ public class AuthService {
                 savedUser.getName(),
                 savedUser.getEmail(),
                 savedUser.getRole().name(),
-                "Registration successful"
-        );
+                "Registration successful",
+                jwtService.generateToken(savedUser));
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -66,7 +84,31 @@ public class AuthService {
                 user.getName(),
                 user.getEmail(),
                 user.getRole().name(),
-                "Login successful"
-        );
+                "Login successful",
+                jwtService.generateToken(user));
+    }
+
+    private UserRole resolveRequestedRole(UserRole requestedRole) {
+        UserRole roleToUse = requestedRole == null ? UserRole.CITIZEN : requestedRole;
+        if (!SELF_REGISTRABLE_ROLES.contains(roleToUse)) {
+            throw new IllegalArgumentException("Selected role cannot be self-registered.");
+        }
+        return roleToUse;
+    }
+
+    private UserRegistrationStrategy resolveStrategy(UserRole role) {
+        UserRegistrationStrategy strategy = registrationStrategies.get(role);
+        if (strategy == null) {
+            throw new IllegalArgumentException("No registration strategy found for role: " + role);
+        }
+        return strategy;
+    }
+
+    private Map<UserRole, UserRegistrationStrategy> indexStrategies(List<UserRegistrationStrategy> strategyList) {
+        EnumMap<UserRole, UserRegistrationStrategy> indexed = new EnumMap<>(UserRole.class);
+        for (UserRegistrationStrategy strategy : strategyList) {
+            indexed.put(strategy.supportedRole(), strategy);
+        }
+        return Map.copyOf(indexed);
     }
 }
