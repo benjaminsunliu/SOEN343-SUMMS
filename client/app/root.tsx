@@ -53,7 +53,7 @@ const navItems = [
   { label: "Search", to: "/vehicles/search" },
   { label: "Reserve", to: "/reservation" },
   { label: "Analytics", to: "/analytics/rentals" },
-  { label: "Provider", to: "/provider/vehicles" },
+  { label: "Provider", to: "/provider/operations" },
 ];
 
 export function SiteNav() {
@@ -65,37 +65,43 @@ export function SiteNav() {
   };
 
   return (
-    <header className="border-b border-gray-200 bg-white">
-      <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 text-sm">
-        <div className="font-semibold tracking-tight text-gray-900">
-          SUMMS
-        </div>
-        <div className="flex items-center gap-4">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `rounded-full px-3 py-1 font-medium ${
-                  isActive
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="rounded-full px-3 py-1 font-medium text-gray-600 hover:bg-gray-100"
+    <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-950 border-r border-gray-800 flex flex-col z-50">
+      {/* Logo */}
+      <div className="p-4 border-b border-gray-800">
+        <h1 className="text-xl font-bold text-white">SUMMS</h1>
+        <p className="text-xs text-gray-500">Smart Urban Mobility</p>
+      </div>
+
+      {/* Navigation Items */}
+      <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `block rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-cyan-600 text-white"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              }`
+            }
           >
-            Logout
-          </button>
-        </div>
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
-    </header>
+
+      {/* Logout Button */}
+      <div className="p-3 border-t border-gray-800">
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="w-full rounded-lg px-4 py-2 text-sm font-medium text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+        >
+          Logout
+        </button>
+      </div>
+    </aside>
   );
 }
 

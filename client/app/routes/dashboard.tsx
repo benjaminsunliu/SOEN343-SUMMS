@@ -15,7 +15,7 @@ export default function DashboardPage() {
   return (
     <>
       <SiteNav />
-      <main className="min-h-[calc(100vh-56px)] bg-white" />
+      <main className="ml-64 min-h-screen bg-gray-900" />
     </>
   );
 }

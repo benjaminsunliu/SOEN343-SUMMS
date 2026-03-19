@@ -15,10 +15,10 @@ export default function GatewayAnalyticsPage() {
   return (
     <>
       <SiteNav />
-      <main className="pt-16 p-4 container mx-auto">
-        <h1 className="text-2xl font-semibold mb-2">Gateway / Service Analytics</h1>
-        <p className="text-gray-600">
-          This is the placeholder page for gateway or service-level analytics.
+      <main className="ml-64 p-4 container mx-auto bg-gray-900 min-h-screen">
+        <h1 className="text-2xl font-semibold mb-2 text-white">Gateway Analytics</h1>
+        <p className="text-gray-400">
+          Gateway/service-level analytics for the mobility platform.
         </p>
       </main>
     </>

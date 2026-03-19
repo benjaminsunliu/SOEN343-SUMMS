@@ -12,10 +12,10 @@ export function meta({}: Route.MetaArgs) {
 
 export default function PaymentPage() {
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1 className="text-2xl font-semibold mb-2">Payment Processing</h1>
-      <p className="text-gray-600">
-        This is the placeholder page for payment processing (simulation acceptable).
+    <main className="ml-64 p-4 container mx-auto bg-gray-900 min-h-screen">
+      <h1 className="text-2xl font-semibold mb-2 text-white">Payment</h1>
+      <p className="text-gray-400">
+        Simulated payment processing for rentals.
       </p>
     </main>
   );

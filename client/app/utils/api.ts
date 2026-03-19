@@ -11,4 +11,19 @@ export function apiUrl(path: string): string {
   return normalizedPath;
 }
 
+export async function apiFetch(
+  url: string,
+  options: RequestInit & { headers?: Record<string, string> } = {}
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...options.headers,
+  };
+
+  return fetch(apiUrl(url), {
+    ...options,
+    headers,
+  });
+}
+
 
