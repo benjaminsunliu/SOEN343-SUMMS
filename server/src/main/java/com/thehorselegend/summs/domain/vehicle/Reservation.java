@@ -1,6 +1,7 @@
 package com.thehorselegend.summs.domain.vehicle;
 
 import com.thehorselegend.summs.domain.user.User;
+import com.thehorselegend.summs.infrastructure.persistence.LocationEmbeddable;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
 import jakarta.persistence.*;
@@ -21,8 +22,19 @@ public class Reservation {
     @JoinColumn(name = "vehicle_id", nullable = false)
     private VehicleEntity vehicle;
 
-    private String startLocation;
-    private String endLocation;
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "latitude", column = @Column(name = "start_latitude", nullable = false)),
+            @AttributeOverride(name = "longitude", column = @Column(name = "start_longitude", nullable = false))
+    })
+    private LocationEmbeddable startLocation;
+
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "latitude", column = @Column(name = "end_latitude", nullable = false)),
+            @AttributeOverride(name = "longitude", column = @Column(name = "end_longitude", nullable = false))
+    })
+    private LocationEmbeddable endLocation;
     private String city;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
@@ -35,10 +47,10 @@ public class Reservation {
     public void setUser(UserEntity user) { this.user = user; }
     public VehicleEntity getVehicle() { return vehicle; }
     public void setVehicle(VehicleEntity vehicle) { this.vehicle = vehicle; }
-    public String getStartLocation() { return startLocation; }
-    public void setStartLocation(String startLocation) { this.startLocation = startLocation; }
-    public String getEndLocation() { return endLocation; }
-    public void setEndLocation(String endLocation) { this.endLocation = endLocation; }
+    public LocationEmbeddable getStartLocation() { return startLocation; }
+    public void setStartLocation(LocationEmbeddable startLocation) { this.startLocation = startLocation; }
+    public LocationEmbeddable getEndLocation() { return endLocation; }
+    public void setEndLocation(LocationEmbeddable endLocation) { this.endLocation = endLocation; }
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
     public LocalDateTime getStartDate() { return startDate; }

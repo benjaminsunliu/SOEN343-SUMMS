@@ -1,13 +1,11 @@
 package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.domain.user.User;
+import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Reservation;
 import com.thehorselegend.summs.domain.vehicle.ReservationStatus;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
-import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
-import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
-import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
-import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
+import com.thehorselegend.summs.infrastructure.persistence.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
@@ -18,6 +16,7 @@ public class ReservationService{
     private final ReservationRepository reservationRepository;
     private final VehicleRepository vehicleRepository;
 
+
     public ReservationService(ReservationRepository reservationRepository, VehicleRepository vehicleRepository) {
         this.reservationRepository = reservationRepository;
         this.vehicleRepository = vehicleRepository;
@@ -27,8 +26,8 @@ public class ReservationService{
     public Reservation reserveVehicle(
             UserEntity user,
             Long vehicleId,
-            String startLocation,
-            String endLocation,
+            Location startLocation,
+            Location endLocation,
             String city,
             LocalDateTime startDate,
             LocalDateTime endDate
@@ -48,8 +47,8 @@ public class ReservationService{
         Reservation reservation = new Reservation();
         reservation.setUser(user);
         reservation.setVehicle(vehicle);
-        reservation.setStartLocation(startLocation);
-        reservation.setEndLocation(endLocation);
+        reservation.setStartLocation(new LocationEmbeddable(startLocation.latitude(), startLocation.longitude()));
+        reservation.setEndLocation(new LocationEmbeddable(endLocation.latitude(), endLocation.longitude()));
         reservation.setCity(city);
         reservation.setStartDate(startDate);
         reservation.setEndDate(endDate);

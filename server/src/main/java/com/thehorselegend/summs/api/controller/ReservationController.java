@@ -1,11 +1,10 @@
 package com.thehorselegend.summs.api.controller;
 
 import com.thehorselegend.summs.api.dto.ReservationRequest;
-import com.thehorselegend.summs.domain.user.User;
+import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Reservation;
 import com.thehorselegend.summs.application.service.ReservationService;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
-import com.thehorselegend.summs.infrastructure.persistence.UserRepository;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -38,8 +37,8 @@ public class ReservationController {
         Reservation reservation = reservationService.reserveVehicle(
                 user,
                 vehicleId,
-                request.startLocation(),
-                request.endLocation(),
+                new Location(request.startLocation().latitude(), request.startLocation().longitude()),
+                new Location(request.endLocation().latitude(), request.endLocation().longitude()),
                 request.city(),
                 request.startDate(),
                 request.endDate()
