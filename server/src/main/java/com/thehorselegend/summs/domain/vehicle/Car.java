@@ -13,7 +13,7 @@ public class Car extends Vehicle {
             Double costPerMinute,
             String licensePlate,
             Integer seatingCapacity) {
-        super(id, VehicleType.CAR, status, location, providerId, costPerMinute);
+        super(id, status, location, providerId, costPerMinute);
         this.licensePlate = licensePlate;
         this.seatingCapacity = seatingCapacity;
     }

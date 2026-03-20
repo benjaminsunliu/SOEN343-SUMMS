@@ -11,7 +11,7 @@ public class Scooter extends Vehicle {
             Long providerId,
             Double costPerMinute,
             Double maxRange) {
-        super(id, VehicleType.SCOOTER, status, location, providerId, costPerMinute);
+        super(id, status, location, providerId, costPerMinute);
         this.maxRange = maxRange;
     }
 

@@ -3,7 +3,6 @@ package com.thehorselegend.summs.domain.vehicle;
 public abstract class Vehicle {
     
     private Long id;
-    private VehicleType type;
     private VehicleStatus status;
     private Location location;
     private Long providerId;
@@ -13,13 +12,11 @@ public abstract class Vehicle {
     // the domain vehicle factory and persistence mappers.
     protected Vehicle(
             Long id,
-            VehicleType type,
             VehicleStatus status,
             Location location,
             Long providerId,
             Double costPerMinute) {
         this.id = id;
-        this.type = type;
         this.status = status;
         this.location = location;
         this.providerId = providerId;
@@ -29,10 +26,6 @@ public abstract class Vehicle {
     // Getters
     public Long getId() {
         return id;
-    }
-
-    public VehicleType getType() {
-        return type;
     }
 
     public VehicleStatus getStatus() {
