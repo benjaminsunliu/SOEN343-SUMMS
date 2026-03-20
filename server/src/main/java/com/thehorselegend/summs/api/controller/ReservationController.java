@@ -46,4 +46,25 @@ public class ReservationController {
 
         return ResponseEntity.ok(reservation);
     }
+
+    @PostMapping("/reservations/{reservationId}/cancel")
+    public ResponseEntity<?> cancelReservation(
+            @PathVariable Long reservationId,
+            HttpSession session
+    ) {
+        UserEntity user = (UserEntity) session.getAttribute("user");
+
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body("User not logged in");
+        }
+
+        try {
+            Reservation cancelled = reservationService.cancelReservation(reservationId, user);
+            return ResponseEntity.ok(cancelled);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        }
+    }
 }

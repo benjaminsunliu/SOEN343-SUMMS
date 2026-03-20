@@ -56,4 +56,27 @@ public class ReservationService{
 
         return reservationRepository.save(reservation);
     }
+
+    @Transactional
+    public Reservation cancelReservation(Long reservationId, UserEntity user) {
+
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new RuntimeException("Reservation not found"));
+
+
+        if (!reservation.getUser().getId().equals(user.getId())) {
+            throw new RuntimeException("You cannot cancel someone else's reservation");
+        }
+
+
+        reservation.setStatus(ReservationStatus.CANCELLED);
+
+
+        VehicleEntity vehicle = reservation.getVehicle();
+        vehicle.setStatus(VehicleStatus.AVAILABLE);
+        vehicleRepository.save(vehicle);
+
+
+        return reservationRepository.save(reservation);
+    }
 }
