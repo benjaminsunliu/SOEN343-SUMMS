@@ -7,13 +7,15 @@ import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /**
  * REST Controller for vehicle management.
- * Handles HTTP requests for creating, retrieving, updating, and deleting vehicles.
+ * Handles HTTP requests for creating, retrieving, updating, and deleting
+ * vehicles.
  * 
  * General structure:
  * - Receives DTOs in requests
@@ -33,23 +35,24 @@ public class VehicleController {
         this.vehicleSearchService = vehicleSearchService;
     }
 
-    // NOTE: REST API Names are up for discussion. 
-    // We can change them if we want. 
+    // NOTE: REST API Names are up for discussion.
+    // We can change them if we want.
     // I just went with the most straightforward ones for now.
-    
+
     // Create a new bicycle
     // POST /api/vehicles/bicycles
     @PostMapping("/bicycles")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public VehicleResponse createBicycle(@Valid @RequestBody CreateBicycleRequest request) {
         return vehicleService.createBicycle(request);
     }
 
-    
     // Create a new scooter
     // POST /api/vehicles/scooters
     @PostMapping("/scooters")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public VehicleResponse createScooter(@Valid @RequestBody CreateScooterRequest request) {
         return vehicleService.createScooter(request);
     }
@@ -58,6 +61,7 @@ public class VehicleController {
     // POST /api/vehicles/cars
     @PostMapping("/cars")
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public VehicleResponse createCar(@Valid @RequestBody CreateCarRequest request) {
         return vehicleService.createCar(request);
     }
@@ -86,6 +90,7 @@ public class VehicleController {
     // Retrieve all vehicles owned by a specific provider
     // GET /api/vehicles/provider/{providerId}
     @GetMapping("/provider/{providerId}")
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public List<VehicleResponse> getVehiclesByProvider(@PathVariable Long providerId) {
         return vehicleService.getVehiclesByProviderId(providerId);
     }
@@ -93,6 +98,7 @@ public class VehicleController {
     // Update a vehicle's status
     // PATCH /api/vehicles/{vehicleId}/status
     @PatchMapping("/{vehicleId}/status")
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public VehicleResponse updateVehicleStatus(
             @PathVariable Long vehicleId,
             @RequestParam VehicleStatus status) {
@@ -102,6 +108,7 @@ public class VehicleController {
     // Update a vehicle's location
     // PATCH /api/vehicles/{vehicleId}/location
     @PatchMapping("/{vehicleId}/location")
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public VehicleResponse updateVehicleLocation(
             @PathVariable Long vehicleId,
             @Valid @RequestBody LocationDto location) {
@@ -112,6 +119,7 @@ public class VehicleController {
     // DELETE /api/vehicles/{vehicleId}
     @DeleteMapping("/{vehicleId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public void deleteVehicle(@PathVariable Long vehicleId) {
         vehicleService.deleteVehicle(vehicleId);
     }
