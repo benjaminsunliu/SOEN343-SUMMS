@@ -88,7 +88,7 @@ export default function ProviderVehiclesPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-64 p-4 container mx-auto bg-gray-900 min-h-screen">
+      <main className="ml-56 p-4 container mx-auto bg-gray-900 min-h-screen">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h1 className="text-3xl font-bold text-white">Vehicle Management</h1>

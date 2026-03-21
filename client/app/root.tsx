@@ -74,7 +74,7 @@ export function SiteNav() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-gray-950 border-r border-gray-800 flex flex-col z-50">
+    <aside className="fixed left-0 top-0 h-screen w-56 bg-gray-950 border-r border-gray-800 flex flex-col z-50">
       {/* Logo */}
       <div className="p-4 border-b border-gray-800">
         <h1 className="text-xl font-bold text-white">SUMMS</h1>

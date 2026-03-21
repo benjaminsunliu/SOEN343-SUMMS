@@ -12,7 +12,7 @@ export function meta({}: Route.MetaArgs) {
 
 export default function PaymentPage() {
   return (
-    <main className="ml-64 p-4 container mx-auto bg-gray-900 min-h-screen">
+    <main className="ml-56 p-4 container mx-auto bg-gray-900 min-h-screen">
       <h1 className="text-2xl font-semibold mb-2 text-white">Payment</h1>
       <p className="text-gray-400">
         Simulated payment processing for rentals.

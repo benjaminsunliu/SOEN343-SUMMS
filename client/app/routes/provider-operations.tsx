@@ -107,7 +107,7 @@ export default function ProviderOperationsPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-64 bg-gray-900 min-h-screen">
+      <main className="ml-56 bg-gray-900 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex justify-between items-start mb-8">
@@ -260,9 +260,9 @@ export default function ProviderOperationsPage() {
                               <StatusBadge status={vehicle.status} />
                             </td>
                             <td className="py-3 px-4 text-gray-400 text-xs">
-                              📍 {vehicle.location.latitude.toFixed(2)}, {vehicle.location.longitude.toFixed(2)}
+                               {vehicle.location.latitude.toFixed(2)}, {vehicle.location.longitude.toFixed(2)}
                             </td>
-                            <td className="py-3 px-4 text-center text-gray-400">🔋 85%</td>
+                            <td className="py-3 px-4 text-center text-gray-400"> 85%</td>
                             <td className="py-3 px-4 text-gray-300 font-medium">${vehicle.costPerMinute.toFixed(2)}/hr CAD</td>
                             <td className="py-3 px-4 text-center text-gray-400">{Math.floor(Math.random() * 300)}</td>
                           </tr>
