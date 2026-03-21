@@ -160,25 +160,25 @@ export default function Register() {
 
 
   return (
-    <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-white px-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-md border border-gray-200 p-8 space-y-6">
+    <main className="flex min-h-screen items-center justify-center bg-gray-900 px-4">
+      <div className="w-full max-w-lg rounded-2xl bg-gray-800 shadow-md border border-gray-700 p-8 space-y-6">
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
             Create your account
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-400">
             Register to SUMMS and tell us about your mobility preferences.
           </p>
         </header>
 
         {successMessage && (
-          <div className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
+          <div className="rounded-md border border-green-600 bg-green-900 bg-opacity-20 px-4 py-2 text-sm text-green-300">
             {successMessage}
           </div>
         )}
 
         {errorMessage && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">
+          <div className="rounded-md border border-red-600 bg-red-900 bg-opacity-20 px-4 py-2 text-sm text-red-300">
             {errorMessage}
           </div>
         )}
@@ -187,7 +187,7 @@ export default function Register() {
           <div className="space-y-1.5">
             <label
               htmlFor="name"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-300"
             >
               Full name
             </label>
@@ -198,17 +198,17 @@ export default function Register() {
               autoComplete="name"
               value={formData.name}
               onChange={handleChange}
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="block w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-500 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
             />
             {errors.name && (
-              <p className="text-xs text-red-500">{errors.name}</p>
+              <p className="text-xs text-red-400">{errors.name}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-300"
             >
               Email
             </label>
@@ -219,10 +219,10 @@ export default function Register() {
               autoComplete="email"
               value={formData.email}
               onChange={handleChange}
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="block w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-500 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
             />
             {errors.email && (
-              <p className="text-xs text-red-500">{errors.email}</p>
+              <p className="text-xs text-red-400">{errors.email}</p>
             )}
           </div>
 
@@ -230,7 +230,7 @@ export default function Register() {
             <div className="space-y-1.5">
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium text-gray-300"
               >
                 Password
               </label>
@@ -241,17 +241,17 @@ export default function Register() {
                 autoComplete="new-password"
                 value={formData.password}
                 onChange={handleChange}
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="block w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-500 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               />
               {errors.password && (
-                <p className="text-xs text-red-500">{errors.password}</p>
+                <p className="text-xs text-red-400">{errors.password}</p>
               )}
             </div>
 
             <div className="space-y-1.5">
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium text-gray-300"
               >
                 Confirm password
               </label>
@@ -262,10 +262,10 @@ export default function Register() {
                 autoComplete="new-password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                className="block w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-500 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               />
               {errors.confirmPassword && (
-                <p className="text-xs text-red-500">{errors.confirmPassword}</p>
+                <p className="text-xs text-red-400">{errors.confirmPassword}</p>
               )}
             </div>
           </div>
@@ -273,11 +273,21 @@ export default function Register() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50 disabled:cursor-not-allowed disabled:opacity-70"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-gray-900 shadow-sm transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800 disabled:cursor-not-allowed disabled:opacity-70"
           >
             {submitting ? "Registering..." : "Register"}
           </button>
         </form>
+
+        <p className="text-sm text-gray-400">
+          Already have an account?{" "}
+          <Link
+            to="/login"
+            className="font-medium text-cyan-400 hover:text-cyan-300"
+          >
+            Login
+          </Link>
+        </p>
       </div>
     </main>
   );

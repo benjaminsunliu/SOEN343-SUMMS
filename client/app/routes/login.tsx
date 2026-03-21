@@ -98,19 +98,19 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-[calc(100vh-56px)] items-center justify-center bg-white px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white shadow-md border border-gray-200 p-8 space-y-6">
+    <main className="flex min-h-screen items-center justify-center bg-gray-900 px-4">
+      <div className="w-full max-w-md rounded-2xl bg-gray-800 shadow-md border border-gray-700 p-8 space-y-6">
         <header className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
             Welcome back
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-400">
             Sign in to access your SUMMS dashboard.
           </p>
         </header>
 
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          <div className="rounded-md border border-red-600 bg-red-900 bg-opacity-20 px-3 py-2 text-xs text-red-300">
             {error}
           </div>
         )}
@@ -119,7 +119,7 @@ export default function LoginPage() {
           <div className="space-y-1.5">
             <label
               htmlFor="email"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-300"
             >
               Email
             </label>
@@ -130,14 +130,14 @@ export default function LoginPage() {
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="block w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-500 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
             />
           </div>
 
           <div className="space-y-1.5">
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700"
+              className="block text-sm font-medium text-gray-300"
             >
               Password
             </label>
@@ -146,7 +146,7 @@ export default function LoginPage() {
               name="password"
               type="password"
               autoComplete="current-password"
-              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="block w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-sm text-white placeholder-gray-500 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -154,17 +154,17 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-50"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-medium text-gray-900 shadow-sm transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800"
           >
             Login
           </button>
         </form>
 
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-400">
           Don&apos;t have an account?{" "}
           <Link
             to="/register"
-            className="font-medium text-blue-600 hover:underline"
+            className="font-medium text-cyan-400 hover:text-cyan-300"
           >
             Register
           </Link>
