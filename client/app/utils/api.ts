@@ -16,12 +16,14 @@ export function apiUrl(path: string): string {
 
 export async function apiFetch(
   url: string,
-  options: RequestInit & { headers?: Record<string, string> } = {},
+  options: RequestInit = {},
 ): Promise<Response> {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...options.headers,
-  };
+  const headers = new Headers(authHeaders(options.headers));
+
+  // Default to JSON for API payloads while preserving caller overrides.
+  if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
 
   return fetch(apiUrl(url), {
     ...options,
