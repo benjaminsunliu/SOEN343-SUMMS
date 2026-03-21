@@ -1,6 +1,25 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { isAuthenticated } from "../utils/auth";
+import { hasAnyRole, type AuthRole, isAuthenticated } from "../utils/auth";
+
+interface RouteRoleRule {
+  pattern: RegExp;
+  roles: AuthRole[];
+}
+
+const routeRoleRules: RouteRoleRule[] = [
+  { pattern: /^\/provider(\/|$)/, roles: ["PROVIDER", "ADMIN"] },
+  { pattern: /^\/analytics(\/|$)/, roles: ["PROVIDER", "ADMIN"] },
+];
+
+function isRouteAuthorized(pathname: string): boolean {
+  const matchedRule = routeRoleRules.find((rule) => rule.pattern.test(pathname));
+  if (!matchedRule) {
+    return true;
+  }
+
+  return hasAnyRole(matchedRule.roles);
+}
 
 export default function ProtectedLayout() {
   const location = useLocation();
@@ -10,6 +29,11 @@ export default function ProtectedLayout() {
   useEffect(() => {
     if (!isAuthenticated()) {
       navigate("/", { replace: true, state: { from: location.pathname } });
+      return;
+    }
+
+    if (!isRouteAuthorized(location.pathname)) {
+      navigate("/dashboard", { replace: true });
       return;
     }
 

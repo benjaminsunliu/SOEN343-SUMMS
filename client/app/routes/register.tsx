@@ -9,6 +9,7 @@ interface RegistrationFormData {
   email: string;
   password: string;
   confirmPassword: string;
+  role: "CITIZEN" | "PROVIDER";
 }
 
 interface FormErrors {
@@ -24,9 +25,10 @@ interface AuthResponsePayload {
   email: string;
   role: string;
   message: string;
+  token: string;
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Register | SUMMS" },
     {
@@ -43,6 +45,7 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "CITIZEN",
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -57,7 +60,7 @@ export default function Register() {
   }, [navigate]);
 
   const handleChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -113,6 +116,7 @@ export default function Register() {
           name: formData.name.trim(),
           email: formData.email.trim(),
           password: formData.password,
+          role: formData.role,
         }),
       });
 
@@ -136,6 +140,7 @@ export default function Register() {
         name: data.name,
         email: data.email,
         role: data.role,
+        token: data.token,
       });
       setSuccessMessage(
         data.message || "Registration successful. Redirecting to your dashboard..."
@@ -147,6 +152,7 @@ export default function Register() {
         email: "",
         password: "",
         confirmPassword: "",
+        role: "CITIZEN",
       });
 
       // Navigate to the dashboard after successful registration
@@ -224,6 +230,25 @@ export default function Register() {
             {errors.email && (
               <p className="text-xs text-red-500">{errors.email}</p>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label
+              htmlFor="role"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Account role
+            </label>
+            <select
+              id="role"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              className="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <option value="CITIZEN">Citizen</option>
+              <option value="PROVIDER">Provider</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
