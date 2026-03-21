@@ -9,31 +9,31 @@ import com.thehorselegend.summs.domain.vehicle.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ReservationController.class)
+@org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc(addFilters = false)
 class ReservationControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
-    private ReservationService reservationService;
-
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private ReservationService reservationService;
 
     private MockHttpSession session;
     private UserEntity user;
@@ -49,7 +49,6 @@ class ReservationControllerTest {
 
     @Test
     void testReserveVehicle_success() throws Exception {
-
         LocationDto start = new LocationDto(45.5017, -73.5673);
         LocationDto end = new LocationDto(45.5088, -73.5540);
 
