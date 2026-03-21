@@ -3,6 +3,7 @@ export interface AuthUser {
   name: string;
   email: string;
   role: string;
+  token: string;
 }
 
 const AUTH_STORAGE_KEY = "summs.authUser";
@@ -35,7 +36,8 @@ export function getAuthUser(): AuthUser | null {
       typeof parsed.id === "number" &&
       typeof parsed.name === "string" &&
       typeof parsed.email === "string" &&
-      typeof parsed.role === "string"
+      typeof parsed.role === "string" &&
+      typeof parsed.token === "string"
     ) {
       return parsed as AuthUser;
     }
@@ -59,3 +61,7 @@ export function clearAuth(): void {
   window.localStorage.removeItem(AUTH_STORAGE_KEY);
 }
 
+export function getAuthToken(): string | null {
+  const user = getAuthUser();
+  return user ? user.token : null;
+}
