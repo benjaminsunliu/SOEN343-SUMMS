@@ -10,9 +10,10 @@ interface AuthResponsePayload {
   email: string;
   role: string;
   message: string;
+  token: string;
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ }: Route.MetaArgs) {
   return [
     { title: "Login | SUMMS" },
     { name: "description", content: "User authentication and access." },
@@ -38,9 +39,9 @@ export default function LoginPage() {
 
   const redirectPath =
     location.state &&
-    typeof location.state === "object" &&
-    "from" in location.state &&
-    typeof location.state.from === "string"
+      typeof location.state === "object" &&
+      "from" in location.state &&
+      typeof location.state.from === "string"
       ? location.state.from
       : "/dashboard";
 
@@ -86,6 +87,7 @@ export default function LoginPage() {
         name: data.name,
         email: data.email,
         role: data.role,
+        token: data.token,
       });
       navigate(redirectPath, { replace: true });
     } catch {

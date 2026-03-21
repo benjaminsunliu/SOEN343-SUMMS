@@ -11,7 +11,7 @@ import {
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { clearAuth } from "./utils/auth";
+import { clearAuth, hasAnyRole, type AuthRole } from "./utils/auth";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -48,16 +48,25 @@ export default function App() {
   return <Outlet />;
 }
 
-const navItems = [
+interface NavItem {
+  label: string;
+  to: string;
+  roles?: AuthRole[];
+}
+
+const navItems: NavItem[] = [
   { label: "Dashboard", to: "/dashboard" },
   { label: "Search", to: "/vehicles/search" },
   { label: "Reserve", to: "/reservation" },
-  { label: "Analytics", to: "/analytics/rentals" },
-  { label: "Provider", to: "/provider/operations" },
+  { label: "Analytics", to: "/analytics/rentals", roles: ["PROVIDER", "ADMIN"] },
+  { label: "Provider", to: "/provider/operations", roles: ["PROVIDER", "ADMIN"] },
 ];
 
 export function SiteNav() {
   const navigate = useNavigate();
+  const visibleNavItems = navItems.filter(
+    (item) => !item.roles || hasAnyRole(item.roles),
+  );
 
   const handleLogout = () => {
     clearAuth();
@@ -74,15 +83,14 @@ export function SiteNav() {
 
       {/* Navigation Items */}
       <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `block rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-cyan-600 text-white"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800"
+              `block rounded-lg px-4 py-2 text-sm font-medium transition-colors ${isActive
+                ? "bg-cyan-600 text-white"
+                : "text-gray-400 hover:text-white hover:bg-gray-800"
               }`
             }
           >
