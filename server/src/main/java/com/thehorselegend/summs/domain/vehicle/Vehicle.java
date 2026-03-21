@@ -28,6 +28,10 @@ public abstract class Vehicle {
         return id;
     }
 
+    public String getVehicleType() {
+        return this.getClass().getSimpleName().toUpperCase();
+    }
+
     public VehicleStatus getStatus() {
         return status;
     }
