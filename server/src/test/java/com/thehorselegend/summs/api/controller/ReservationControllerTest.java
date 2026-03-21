@@ -39,6 +39,12 @@ class ReservationControllerTest {
     private MockHttpSession session;
     private UserEntity user;
 
+    @MockBean
+    private com.thehorselegend.summs.infrastructure.security.JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    @MockBean
+    private com.thehorselegend.summs.infrastructure.security.JwtService jwtService;
+
     @BeforeEach
     void setup() {
         user = new UserEntity();
