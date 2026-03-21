@@ -16,14 +16,13 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class ReservationServiceTest {
+class VehicleReservationServiceTest {
 
     @Mock
     private ReservationRepository reservationRepository;
 
     @Mock
     private VehicleRepository vehicleRepository;
-
 
     @InjectMocks
     private VehicleReservationService reservationService;
@@ -34,17 +33,19 @@ class ReservationServiceTest {
     @BeforeEach
     void setup() {
         MockitoAnnotations.openMocks(this);
+
         vehicle = new VehicleEntity() {};
         vehicle.setId(1L);
         vehicle.setStatus(VehicleStatus.AVAILABLE);
 
-        UserEntity user = new UserEntity(
+        user = new UserEntity(
                 1L,
                 "Test User",
                 "test@example.com",
                 "password123",
                 UserRole.CITIZEN
         );
+
         reservationService = new VehicleReservationService(reservationRepository, vehicleRepository);
     }
 
@@ -90,7 +91,6 @@ class ReservationServiceTest {
 
     @Test
     void testCancelReservation() {
-        // Arrange
         VehicleEntity vehicle = new BicycleEntity();
         vehicle.setStatus(VehicleStatus.RESERVED);
 
@@ -107,15 +107,12 @@ class ReservationServiceTest {
         reservation.setUser(user);
         reservation.setStatus(ReservationStatus.CONFIRMED);
 
-        // Mock repository calls
-        when(reservationRepository.findById(1L)).thenReturn(java.util.Optional.of(reservation));
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(reservation));
         when(reservationRepository.save(any(Reservation.class))).thenAnswer(i -> i.getArgument(0));
         when(vehicleRepository.save(any(VehicleEntity.class))).thenReturn(vehicle);
 
-        // Act
         reservationService.cancelReservation(1L, user);
 
-        // Assert
         assertEquals(ReservationStatus.CANCELLED, reservation.getStatus());
         assertEquals(VehicleStatus.AVAILABLE, vehicle.getStatus());
     }
