@@ -12,10 +12,10 @@ export function meta({}: Route.MetaArgs) {
 
 export default function ParkingPage() {
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1 className="text-2xl font-semibold mb-2">Parking Feature</h1>
-      <p className="text-gray-600 dark:text-gray-300">
-        This is the placeholder page for navigating to the parking feature (can remain an abstracted external service).
+    <main className="ml-56 p-4 bg-gray-900 min-h-screen">
+      <h1 className="text-2xl font-semibold mb-2 text-white">Parking</h1>
+      <p className="text-gray-400">
+        Navigation entry point for the parking feature (external service).
       </p>
     </main>
   );
