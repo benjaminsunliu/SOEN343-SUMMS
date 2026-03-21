@@ -1,4 +1,4 @@
-package com.thehorselegend.summs.domain.vehicle;
+package com.thehorselegend.summs.domain.reservation;
 
 public enum ReservationStatus {
     PENDING,

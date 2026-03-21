@@ -1,8 +1,7 @@
 package com.thehorselegend.summs.infrastructure.persistence;
 
-import com.thehorselegend.summs.domain.vehicle.Reservation;
-import com.thehorselegend.summs.domain.vehicle.ReservationStatus;
-import com.thehorselegend.summs.domain.vehicle.Vehicle;
+import com.thehorselegend.summs.domain.reservation.Reservation;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

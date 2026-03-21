@@ -3,9 +3,9 @@ package com.thehorselegend.summs.api.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thehorselegend.summs.api.dto.LocationDto;
 import com.thehorselegend.summs.api.dto.ReservationRequest;
-import com.thehorselegend.summs.application.service.ReservationService;
-import com.thehorselegend.summs.domain.vehicle.Reservation;
-import com.thehorselegend.summs.domain.vehicle.ReservationStatus;
+import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
+import com.thehorselegend.summs.domain.reservation.Reservation;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +34,7 @@ class ReservationControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
-    private ReservationService reservationService;
+    private VehicleReservationService reservationService;
 
     private MockHttpSession session;
     private UserEntity user;

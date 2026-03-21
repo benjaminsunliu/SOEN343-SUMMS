@@ -2,8 +2,8 @@ package com.thehorselegend.summs.api.controller;
 
 import com.thehorselegend.summs.api.dto.ReservationRequest;
 import com.thehorselegend.summs.domain.vehicle.Location;
-import com.thehorselegend.summs.domain.vehicle.Reservation;
-import com.thehorselegend.summs.application.service.ReservationService;
+import com.thehorselegend.summs.domain.reservation.Reservation;
+import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.http.HttpStatus;
@@ -14,9 +14,9 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 public class ReservationController {
 
-    private final ReservationService reservationService;
+    private final VehicleReservationService reservationService;
 
-    public ReservationController(ReservationService reservationService) {
+    public ReservationController(VehicleReservationService reservationService) {
         this.reservationService = reservationService;
     }
 

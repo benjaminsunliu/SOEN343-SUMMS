@@ -1,6 +1,8 @@
 package com.thehorselegend.summs.application.service;
 
-import com.thehorselegend.summs.domain.user.User;
+import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
+import com.thehorselegend.summs.domain.reservation.Reservation;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.user.UserRole;
 import com.thehorselegend.summs.domain.vehicle.*;
 import com.thehorselegend.summs.infrastructure.persistence.*;
@@ -24,7 +26,7 @@ class ReservationServiceTest {
 
 
     @InjectMocks
-    private ReservationService reservationService;
+    private VehicleReservationService reservationService;
 
     private VehicleEntity vehicle;
     private UserEntity user;
@@ -43,7 +45,7 @@ class ReservationServiceTest {
                 "password123",
                 UserRole.CITIZEN
         );
-        reservationService = new ReservationService(reservationRepository, vehicleRepository);
+        reservationService = new VehicleReservationService(reservationRepository, vehicleRepository);
     }
 
     @Test

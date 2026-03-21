@@ -1,6 +1,5 @@
-package com.thehorselegend.summs.domain.vehicle;
+package com.thehorselegend.summs.domain.reservation;
 
-import com.thehorselegend.summs.domain.user.User;
 import com.thehorselegend.summs.infrastructure.persistence.LocationEmbeddable;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
