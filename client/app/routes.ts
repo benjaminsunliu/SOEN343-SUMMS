@@ -7,6 +7,8 @@ export default [
 		route("dashboard", "routes/dashboard.tsx"),
 		route("vehicles/search", "routes/vehicle-search.tsx"),
 		route("reservation", "routes/reservation.tsx"),
+		route("trips/active", "routes/active-trip.tsx"),
+		route("trips/summary/:tripId", "routes/trip-summary.tsx"),
 		route("payment", "routes/payment.tsx"),
 		route("vehicle-return", "routes/vehicle-return.tsx"),
 		route("provider/vehicles", "routes/provider-vehicles.tsx"),

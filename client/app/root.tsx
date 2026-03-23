@@ -58,6 +58,7 @@ const navItems: NavItem[] = [
   { label: "Dashboard", to: "/dashboard" },
   { label: "Search", to: "/vehicles/search" },
   { label: "Reserve", to: "/reservation" },
+  { label: "Active Trip", to: "/trips/active" },
   { label: "Analytics", to: "/analytics/rentals", roles: ["PROVIDER", "ADMIN"] },
   { label: "Provider", to: "/provider/operations", roles: ["PROVIDER", "ADMIN"] },
 ];
