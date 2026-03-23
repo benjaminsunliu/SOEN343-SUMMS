@@ -24,43 +24,15 @@ public class VehicleReservationRequest {
         this.endDate = endDate;
     }
 
-    public LocationDto getStartLocation() {
-        return startLocation;
-    }
+    public LocationDto getStartLocation() { return startLocation; }
+    public LocationDto getEndLocation() { return endLocation; }
+    public String getCity() { return city; }
+    public LocalDateTime getStartDate() { return startDate; }
+    public LocalDateTime getEndDate() { return endDate; }
 
-    public LocationDto getEndLocation() {
-        return endLocation;
-    }
-
-    public String getCity() {
-        return city;
-    }
-
-    public LocalDateTime getStartDate() {
-        return startDate;
-    }
-
-    public LocalDateTime getEndDate() {
-        return endDate;
-    }
-
-    public void setStartLocation(LocationDto startLocation) {
-        this.startLocation = startLocation;
-    }
-
-    public void setEndLocation(LocationDto endLocation) {
-        this.endLocation = endLocation;
-    }
-
-    public void setCity(String city) {
-        this.city = city;
-    }
-
-    public void setStartDate(LocalDateTime startDate) {
-        this.startDate = startDate;
-    }
-
-    public void setEndDate(LocalDateTime endDate) {
-        this.endDate = endDate;
-    }
+    public void setStartLocation(LocationDto startLocation) { this.startLocation = startLocation; }
+    public void setEndLocation(LocationDto endLocation) { this.endLocation = endLocation; }
+    public void setCity(String city) { this.city = city; }
+    public void setStartDate(LocalDateTime startDate) { this.startDate = startDate; }
+    public void setEndDate(LocalDateTime endDate) { this.endDate = endDate; }
 }

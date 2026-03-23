@@ -2,7 +2,7 @@ package com.thehorselegend.summs.domain.reservation;
 
 import java.time.LocalDateTime;
 
-public class Reservation {
+public abstract class Reservation {
     private final Long reservationId;
     private final Long userId;
     private ReservableType reservableType;
@@ -20,6 +20,12 @@ public class Reservation {
         this.endDate = endDate;
         this.city = city;
         this.status = status;
+    }
+
+    public Reservation(Long userId, Long reservableId,
+                       LocalDateTime startDate, LocalDateTime endDate,
+                       String city, ReservationStatus status) {
+        this(null, userId, reservableId, startDate, endDate, city, status);
     }
 
     public boolean overlaps(LocalDateTime start, LocalDateTime end) {

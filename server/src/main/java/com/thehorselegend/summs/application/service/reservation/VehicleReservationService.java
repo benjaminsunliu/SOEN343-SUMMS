@@ -2,12 +2,14 @@ package com.thehorselegend.summs.application.service.reservation;
 
 import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
+import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
+import com.thehorselegend.summs.api.dto.LocationDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,13 +31,13 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
 
     @Override
     protected void validateAvailability(Vehicle vehicle, LocalDateTime start, LocalDateTime end) {
+        System.out.println("Vehicle status: " + vehicle.getStatus());
         if (!vehicle.isAvailable()) {
             throw new IllegalStateException("Vehicle is not available for reservation");
         }
         if (start.isAfter(end)) {
             throw new IllegalArgumentException("Start date must be before end date");
         }
-        // Optionally, check overlapping reservations in DB
         boolean hasConflict = reservationRepository.findByReservableId(vehicle.getId()).stream()
                 .anyMatch(r -> r.getStatus() == ReservationStatus.PENDING
                         && start.isBefore(r.getEndDate())
@@ -47,14 +49,14 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
 
     @Override
     protected Reservation buildReservation(Vehicle vehicle, Long userId, LocalDateTime start, LocalDateTime end) {
-        return new Reservation(
-                null,
+        return new VehicleReservation(
                 userId,
                 vehicle.getId(),
                 start,
                 end,
                 "CITY",
-                ReservationStatus.PENDING
+                vehicle.getLocation(), // start location
+                vehicle.getLocation()  // end location placeholder
         );
     }
 
@@ -63,12 +65,14 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
     protected Reservation saveReservation(Reservation reservation) {
         var entity = ReservationMapper.toEntity(reservation);
         var savedEntity = reservationRepository.save(entity);
+
         vehicleRepository.findById(reservation.getReservableId())
                 .map(VehicleMapper::toDomain)
                 .ifPresent(v -> {
                     v.reserve();
                     vehicleRepository.save(VehicleMapper.toEntity(v));
                 });
+
         return ReservationMapper.toDomain(savedEntity);
     }
 
@@ -77,6 +81,8 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
             Long userId,
             Long vehicleId,
             String city,
+            LocationDto startLocationDto,
+            LocationDto endLocationDto,
             LocalDateTime startDate,
             LocalDateTime endDate
     ) {
@@ -84,16 +90,23 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
-        Reservation reservation = createReservation(vehicle, userId, startDate, endDate);
+        VehicleReservation reservation = new VehicleReservation(
+                userId,
+                vehicleId,
+                startDate,
+                endDate,
+                city,
+                new Location(startLocationDto.latitude(), startLocationDto.longitude()),
+                new Location(endLocationDto.latitude(), endLocationDto.longitude())
+        );
 
-        reservation.setCity(city);
+        validateAvailability(vehicle, startDate, endDate);
 
-        return saveReservation(reservation);
+        return (VehicleReservation) saveReservation(reservation);
     }
 
     @Transactional
     public Reservation cancelReservation(Long reservationId, Long userId) {
-
         var entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
 

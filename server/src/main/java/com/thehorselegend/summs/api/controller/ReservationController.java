@@ -4,6 +4,8 @@ import com.thehorselegend.summs.api.dto.VehicleReservationRequest;
 import com.thehorselegend.summs.api.dto.VehicleReservationResponse;
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
 import com.thehorselegend.summs.domain.reservation.Reservation;
+import com.thehorselegend.summs.domain.reservation.VehicleReservation;
+import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
@@ -33,13 +35,18 @@ public class ReservationController {
             @RequestBody VehicleReservationRequest request,
             @SessionAttribute("user") UserEntity user
     ) {
-        Reservation reservation = reservationService.reserveVehicle(
+        // Pass start/end LocationDto from request
+        VehicleReservation reservation = (VehicleReservation) reservationService.reserveVehicle(
                 user.getId(),
                 vehicleId,
                 request.getCity(),
+                request.getStartLocation(),
+                request.getEndLocation(),
                 request.getStartDate(),
                 request.getEndDate()
         );
+
+        reservation.confirm();
 
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .map(VehicleMapper::toDomain)
@@ -48,50 +55,75 @@ public class ReservationController {
         return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation, vehicle));
     }
 
-    @PostMapping("/reservations/{reservationId}/cancel")
-    public ResponseEntity<VehicleReservationResponse> cancelReservation(
+    @PostMapping("/vehicle-reservations/{reservationId}/cancel")
+    public ResponseEntity<VehicleReservationResponse> cancelVehicleReservation(
             @PathVariable Long reservationId,
             @SessionAttribute("user") UserEntity user
     ) {
+        // Cancel the reservation using the service
         reservationService.cancelReservation(reservationId, user.getId());
 
+        // Fetch the reservation and ensure it's a VehicleReservation
         Reservation reservation = reservationService.getReservationById(reservationId);
+        if (!(reservation instanceof VehicleReservation vehicleReservation)) {
+            throw new IllegalArgumentException("Reservation is not a vehicle reservation");
+        }
 
-        Vehicle vehicle = vehicleRepository.findById(reservation.getReservableId())
+        // Fetch the associated vehicle
+        Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
-        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation, vehicle));
+        // Return DTO
+        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(vehicleReservation, vehicle));
     }
 
-    @GetMapping("/users/me/reservations")
-    public ResponseEntity<List<VehicleReservationResponse>> getUserReservations(
+
+
+    @GetMapping("/users/me/vehicle-reservations")
+    public ResponseEntity<List<VehicleReservationResponse>> getUserVehicleReservations(
             @SessionAttribute("user") UserEntity user
     ) {
+        // Fetch all reservations of the user
         List<Reservation> reservations = reservationService.getUserReservations(user.getId());
 
+        // Filter only vehicle reservations
         List<VehicleReservationResponse> response = reservations.stream()
-                .map(r -> {
-                    Vehicle vehicle = vehicleRepository.findById(r.getReservableId())
+                .filter(reservation -> reservation instanceof VehicleReservation)
+                .map(reservation -> {
+                    VehicleReservation vehicleReservation = (VehicleReservation) reservation;
+
+                    // Fetch vehicle info
+                    Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
                             .map(VehicleMapper::toDomain)
                             .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
-                    return VehicleReservationResponse.fromDomain(r, vehicle);
+
+                    // Convert to DTO
+                    return VehicleReservationResponse.fromDomain(vehicleReservation, vehicle);
                 })
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/reservations/{reservationId}")
-    public ResponseEntity<VehicleReservationResponse> getReservationById(
+    @GetMapping("/vehicle-reservations/{reservationId}")
+    public ResponseEntity<VehicleReservationResponse> getVehicleReservationById(
             @PathVariable Long reservationId
     ) {
+        // Fetch reservation from service
         Reservation reservation = reservationService.getReservationById(reservationId);
 
-        Vehicle vehicle = vehicleRepository.findById(reservation.getReservableId())
+        // Ensure it’s a VehicleReservation
+        if (!(reservation instanceof VehicleReservation vehicleReservation)) {
+            throw new IllegalArgumentException("Reservation is not a vehicle reservation");
+        }
+
+        // Fetch the associated vehicle
+        Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
-        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation, vehicle));
+        // Map to DTO
+        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(vehicleReservation, vehicle));
     }
 }

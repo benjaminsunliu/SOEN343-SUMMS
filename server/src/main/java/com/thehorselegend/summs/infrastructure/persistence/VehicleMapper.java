@@ -58,11 +58,12 @@ public class VehicleMapper {
         }
 
         Location location = toLocation(entity.getLocation());
+        VehicleStatus status = entity.getStatus();
 
         if (entity instanceof BicycleEntity bicycle) {
             return new Bicycle(
                     bicycle.getId(),
-                    bicycle.getStatus(),
+                    status,
                     location,
                     bicycle.getProviderId(),
                     bicycle.getCostPerMinute()

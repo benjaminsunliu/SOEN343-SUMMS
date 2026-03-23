@@ -4,4 +4,5 @@ public record LocationDto(
         Double latitude,
         Double longitude
 ) {
+
 }

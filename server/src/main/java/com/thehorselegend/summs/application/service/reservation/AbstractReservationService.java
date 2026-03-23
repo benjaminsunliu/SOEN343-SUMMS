@@ -27,6 +27,5 @@ public abstract class AbstractReservationService<T> {
                                                     LocalDateTime start,
                                                     LocalDateTime end);
 
-    // ✅ FIX: add return type
     protected abstract Reservation saveReservation(Reservation reservation);
 }
