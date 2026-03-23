@@ -15,10 +15,10 @@ export default function RentalAnalyticsPage() {
   return (
     <>
       <SiteNav />
-      <main className="pt-16 p-4 container mx-auto">
-        <h1 className="text-2xl font-semibold mb-2">Rental Analytics</h1>
-        <p className="text-gray-600">
-          This is the placeholder page for rental-related analytics.
+      <main className="ml-56 p-4 bg-gray-900 min-h-screen">
+        <h1 className="text-2xl font-semibold mb-2 text-white">Rental Analytics</h1>
+        <p className="text-gray-400">
+          Analytics related to rentals and usage patterns.
         </p>
       </main>
     </>

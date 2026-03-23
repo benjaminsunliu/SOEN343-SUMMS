@@ -6,6 +6,8 @@ export interface AuthUser {
   token: string;
 }
 
+export type AuthRole = "CITIZEN" | "PROVIDER" | "ADMIN";
+
 const AUTH_STORAGE_KEY = "summs.authUser";
 
 function isBrowser(): boolean {
@@ -64,4 +66,27 @@ export function clearAuth(): void {
 export function getAuthToken(): string | null {
   const user = getAuthUser();
   return user ? user.token : null;
+}
+
+export function getAuthRole(): AuthRole | null {
+  const user = getAuthUser();
+  if (!user) {
+    return null;
+  }
+
+  const normalizedRole = user.role.trim().toUpperCase();
+  if (
+    normalizedRole === "CITIZEN" ||
+    normalizedRole === "PROVIDER" ||
+    normalizedRole === "ADMIN"
+  ) {
+    return normalizedRole;
+  }
+
+  return null;
+}
+
+export function hasAnyRole(roles: AuthRole[]): boolean {
+  const role = getAuthRole();
+  return role !== null && roles.includes(role);
 }

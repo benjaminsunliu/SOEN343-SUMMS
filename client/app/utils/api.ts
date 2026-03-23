@@ -14,6 +14,23 @@ export function apiUrl(path: string): string {
   return normalizedPath;
 }
 
+export async function apiFetch(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
+  const headers = new Headers(authHeaders(options.headers));
+
+  // Default to JSON for API payloads while preserving caller overrides.
+  if (!(options.body instanceof FormData) && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  return fetch(apiUrl(url), {
+    ...options,
+    headers,
+  });
+}
+
 export function authHeaders(extraHeaders?: HeadersInit): HeadersInit {
   const token = getAuthToken();
   const headers = new Headers(extraHeaders);
