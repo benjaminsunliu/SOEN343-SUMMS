@@ -8,6 +8,6 @@ public class Bicycle extends Vehicle {
             Location location,
             Long providerId,
             Double costPerMinute) {
-        super(id, status, location, providerId, costPerMinute);
+        super(id, VehicleType.BICYCLE, status, location, providerId, costPerMinute);
     }
 }

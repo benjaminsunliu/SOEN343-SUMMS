@@ -1,8 +1,8 @@
 package com.thehorselegend.summs.domain.vehicle;
 
 public class Scooter extends Vehicle {
-    
-    private Double maxRange;
+
+    private final Double maxRange;
 
     public Scooter(
             Long id,
@@ -11,7 +11,7 @@ public class Scooter extends Vehicle {
             Long providerId,
             Double costPerMinute,
             Double maxRange) {
-        super(id, status, location, providerId, costPerMinute);
+        super(id, VehicleType.SCOOTER, status, location, providerId, costPerMinute);
         this.maxRange = maxRange;
     }
 
@@ -19,7 +19,5 @@ public class Scooter extends Vehicle {
         return maxRange;
     }
 
-    public void setMaxRange(Double maxRange) {
-        this.maxRange = maxRange;
-    }
+
 }

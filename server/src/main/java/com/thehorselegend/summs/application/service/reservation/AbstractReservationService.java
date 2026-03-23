@@ -8,12 +8,12 @@ public abstract class AbstractReservationService<T> {
 
     public Reservation createReservation(T reservable,
                                          Long userId,
-                                         LocalDateTime start,
-                                         LocalDateTime end) {
+                                         LocalDateTime startDate,
+                                         LocalDateTime endDate) {
 
-        validateAvailability(reservable, start, end);
+        validateAvailability(reservable, startDate, endDate);
 
-        Reservation reservation = buildReservation(reservable, userId, start, end);
+        Reservation reservation = buildReservation(reservable, userId, startDate, endDate);
 
         return saveReservation(reservation);
     }

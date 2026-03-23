@@ -1,29 +1,53 @@
 package com.thehorselegend.summs.domain.vehicle;
 
 public abstract class Vehicle {
-    
-    private Long id;
+
+    private final Long id;
+    private final VehicleType type;
     private VehicleStatus status;
     private Location location;
-    private Long providerId;
-    private Double costPerMinute;
+    private final Long providerId;
+    private final Double costPerMinute;
 
     // Constructor's protected as it's used primarily by 
     // the domain vehicle factory and persistence mappers.
     protected Vehicle(
             Long id,
+            VehicleType type,
             VehicleStatus status,
             Location location,
             Long providerId,
             Double costPerMinute) {
         this.id = id;
+        this.type = type;
         this.status = status;
         this.location = location;
         this.providerId = providerId;
         this.costPerMinute = costPerMinute;
     }
 
-    // Getters
+    public VehicleType getType() {
+        return type;
+    }
+
+    public boolean isAvailable() {
+        return status == VehicleStatus.AVAILABLE;
+    }
+
+    public void reserve() {
+        if (status != VehicleStatus.AVAILABLE) throw new IllegalStateException("Vehicle not available");
+        this.status = VehicleStatus.RESERVED;
+    }
+
+    public void makeAvailable() {
+        this.status = VehicleStatus.AVAILABLE;
+    }
+
+    public void release(Location newLocation) {
+        this.status = VehicleStatus.AVAILABLE;
+        this.location = newLocation;
+    }
+
     public Long getId() {
         return id;
     }
@@ -44,20 +68,4 @@ public abstract class Vehicle {
         return costPerMinute;
     }
 
-    // Setters
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setStatus(VehicleStatus status) {
-        this.status = status;
-    }
-
-    public void setLocation(Location location) {
-        this.location = location;
-    }
-
-    public void setCostPerMinute(Double costPerMinute) {
-        this.costPerMinute = costPerMinute;
-    }
 }
