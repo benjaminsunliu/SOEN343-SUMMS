@@ -7,7 +7,7 @@ public abstract class Vehicle {
     private VehicleStatus status;
     private Location location;
     private final Long providerId;
-    private final Double costPerMinute;
+    private Double costPerMinute;
 
     // Constructor's protected as it's used primarily by 
     // the domain vehicle factory and persistence mappers.
@@ -66,6 +66,10 @@ public abstract class Vehicle {
 
     public Double getCostPerMinute() {
         return costPerMinute;
+    }
+
+    public void setStatus(Double costPerMinute) {
+        this.costPerMinute = costPerMinute;
     }
 
 }

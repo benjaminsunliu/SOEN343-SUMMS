@@ -213,16 +213,16 @@ public class VehicleService {
 
         String type;
         if (vehicle instanceof Car car) {
-            type = "CAR";
+            type = VehicleType.CAR.name();
             licensePlate = car.getLicensePlate();
             seatingCapacity = car.getSeatingCapacity();
         } else if (vehicle instanceof Scooter scooter) {
-            type = "SCOOTER";
+            type = VehicleType.SCOOTER.name();
             maxRange = scooter.getMaxRange();
         } else if (vehicle instanceof Bicycle) {
-            type = "BICYCLE";
+            type = VehicleType.BICYCLE.name();
         } else {
-            type = "UNKNOWN";
+            type = null;
         }
 
 
