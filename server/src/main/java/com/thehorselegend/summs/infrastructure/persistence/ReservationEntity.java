@@ -33,17 +33,19 @@ public class ReservationEntity {
     @Column(nullable = false, length = 20)
     private ReservationStatus status;
 
-    @Column(nullable = true)
-    private Double startLatitude;
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "latitude", column = @Column(name = "start_latitude")),
+            @AttributeOverride(name = "longitude", column = @Column(name = "start_longitude"))
+    })
+    private LocationEmbeddable startLocation;
 
-    @Column(nullable = true)
-    private Double startLongitude;
-
-    @Column(nullable = true)
-    private Double endLatitude;
-
-    @Column(nullable = true)
-    private Double endLongitude;
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "latitude", column = @Column(name = "end_latitude")),
+            @AttributeOverride(name = "longitude", column = @Column(name = "end_longitude"))
+    })
+    private LocationEmbeddable endLocation;
 
     public ReservationEntity() {
     }
@@ -56,10 +58,8 @@ public class ReservationEntity {
             LocalDateTime endDate,
             String city,
             ReservationStatus status,
-            Double startLatitude,
-            Double startLongitude,
-            Double endLatitude,
-            Double endLongitude) {
+            LocationEmbeddable startLocation,
+            LocationEmbeddable endLocation) {
         this.id = id;
         this.userId = userId;
         this.reservableId = reservableId;
@@ -67,10 +67,8 @@ public class ReservationEntity {
         this.endDate = endDate;
         this.city = city;
         this.status = status;
-        this.startLatitude = startLatitude;
-        this.startLongitude = startLongitude;
-        this.endLatitude = endLatitude;
-        this.endLongitude = endLongitude;
+        this.startLocation = startLocation;
+        this.endLocation = endLocation;
     }
 
     // Getters & Setters
@@ -130,35 +128,9 @@ public class ReservationEntity {
         this.status = status;
     }
 
-    public Double getStartLatitude() {
-        return startLatitude;
-    }
+    public LocationEmbeddable getStartLocation() { return startLocation; }
+    public void setStartLocation(LocationEmbeddable startLocation) { this.startLocation = startLocation; }
 
-    public void setStartLatitude(Double startLatitude) {
-        this.startLatitude = startLatitude;
-    }
-
-    public Double getStartLongitude() {
-        return startLongitude;
-    }
-
-    public void setStartLongitude(Double startLongitude) {
-        this.startLongitude = startLongitude;
-    }
-
-    public Double getEndLatitude() {
-        return endLatitude;
-    }
-
-    public void setEndLatitude(Double endLatitude) {
-        this.endLatitude = endLatitude;
-    }
-
-    public Double getEndLongitude() {
-        return endLongitude;
-    }
-
-    public void setEndLongitude(Double endLongitude) {
-        this.endLongitude = endLongitude;
-    }
+    public LocationEmbeddable getEndLocation() { return endLocation; }
+    public void setEndLocation(LocationEmbeddable endLocation) { this.endLocation = endLocation; }
 }

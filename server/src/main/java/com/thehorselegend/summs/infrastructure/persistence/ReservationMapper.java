@@ -13,13 +13,18 @@ public class ReservationMapper {
     public static ReservationEntity toEntity(Reservation reservation) {
         if (reservation == null) return null;
 
-        Double startLat = null, startLon = null, endLat = null, endLon = null;
+        LocationEmbeddable startEmbeddable = null;
+        LocationEmbeddable endEmbeddable = null;
 
         if (reservation instanceof VehicleReservation vehicleReservation) {
-            startLat = vehicleReservation.getStartLocation().latitude();
-            startLon = vehicleReservation.getStartLocation().longitude();
-            endLat = vehicleReservation.getEndLocation().latitude();
-            endLon = vehicleReservation.getEndLocation().longitude();
+            startEmbeddable = new LocationEmbeddable(
+                    vehicleReservation.getStartLocation().latitude(),
+                    vehicleReservation.getStartLocation().longitude()
+            );
+            endEmbeddable = new LocationEmbeddable(
+                    vehicleReservation.getEndLocation().latitude(),
+                    vehicleReservation.getEndLocation().longitude()
+            );
         }
 
         return new ReservationEntity(
@@ -30,10 +35,8 @@ public class ReservationMapper {
                 reservation.getEndDate(),
                 reservation.getCity(),
                 reservation.getStatus(),
-                startLat != null ? startLat.doubleValue() : null,
-                startLon != null ? startLon.doubleValue() : null,
-                endLat != null ? endLat.doubleValue() : null,
-                endLon != null ? endLon.doubleValue() : null
+                startEmbeddable,
+                endEmbeddable
         );
     }
 
@@ -42,9 +45,7 @@ public class ReservationMapper {
         if (entity == null) return null;
 
         // If entity has vehicle coordinates, create VehicleReservation
-        if (entity.getStartLatitude() != null && entity.getStartLongitude() != null
-                && entity.getEndLatitude() != null && entity.getEndLongitude() != null) {
-
+        if (entity.getStartLocation() != null && entity.getEndLocation() != null) {
             return new VehicleReservation(
                     entity.getId(),
                     entity.getUserId(),
@@ -52,8 +53,8 @@ public class ReservationMapper {
                     entity.getStartDate(),
                     entity.getEndDate(),
                     entity.getCity(),
-                    new Location(entity.getStartLatitude(), entity.getStartLongitude()),
-                    new Location(entity.getEndLatitude(), entity.getEndLongitude())
+                    new Location(entity.getStartLocation().getLatitude(), entity.getStartLocation().getLongitude()),
+                    new Location(entity.getEndLocation().getLatitude(), entity.getEndLocation().getLongitude())
             );
         }
 

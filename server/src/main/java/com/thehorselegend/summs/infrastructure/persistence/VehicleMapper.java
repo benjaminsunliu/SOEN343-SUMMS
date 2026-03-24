@@ -63,7 +63,7 @@ public class VehicleMapper {
         if (entity instanceof BicycleEntity bicycle) {
             return new Bicycle(
                     bicycle.getId(),
-                    status,
+                    bicycle.getStatus(),
                     location,
                     bicycle.getProviderId(),
                     bicycle.getCostPerMinute()
