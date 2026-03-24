@@ -1,6 +1,7 @@
-import { SiteNav } from "../root";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
+import { SiteNav } from "../root";
+import { MapView, type MapMarker } from "../components/MapView";
 import type { Route } from "./+types/vehicle-search";
 
 interface SearchVehicle {
@@ -14,6 +15,8 @@ interface SearchVehicle {
   available: boolean;
   station: string;
 }
+
+const DEFAULT_CENTER: [number, number] = [45.5019, -73.5674];
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -118,6 +121,11 @@ export default function VehicleSearchPage() {
   const reservePrice = selectedVehicle.price.replace("/hr", "");
   const conditionLabel = selectedVehicle.energy === "Full charge" ? "Excellent" : "Good";
 
+  const markers: MapMarker[] = vehicles.map((vehicle) => ({
+    position: DEFAULT_CENTER, // TODO: replace with real per-vehicle coordinates
+    label: `${vehicle.name} (${vehicle.type})`,
+  }));
+
   return (
     <>
       <SiteNav />
@@ -204,7 +212,12 @@ export default function VehicleSearchPage() {
           </article>
 
           <div className="space-y-3">
-            <h2 className="text-xl font-semibold">Available Vehicles Near You</h2>
+            <h2 className="text-xl font-semibold">Map & Available Vehicles Near You</h2>
+
+            <div className="rounded-2xl border border-[#2a354a] bg-[#06142b] p-3">
+              <h3 className="mb-2 text-lg font-semibold">Map View</h3>
+              <MapView center={DEFAULT_CENTER} markers={markers} />
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {vehicles.map((vehicle) => (
