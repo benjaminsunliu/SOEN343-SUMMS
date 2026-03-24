@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { apiFetch } from "../utils/api";
 import type { Route } from "./+types/dashboard";
+import { getBrowserLocation, type GeoLocation } from "../utils/location";
 
 interface VehicleResponse {
   id: number;
@@ -47,7 +48,21 @@ export default function DashboardPage() {
   const [isLoadingMap, setIsLoadingMap] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
 
+  const [userLocation, setUserLocation] = useState<GeoLocation | null>(null);
+  const [isLocating, setIsLocating] = useState(true);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
+  const [weather, setWeather] = useState<{
+    temperature: number | null;
+    windSpeed: number | null;
+    humidity: number | null;
+    description: string | null;
+  }>({ temperature: null, windSpeed: null, humidity: null, description: null });
+  const [isLoadingWeather, setIsLoadingWeather] = useState(false);
+  const [weatherError, setWeatherError] = useState<string | null>(null);
+
   useEffect(() => {
+    // Fetch vehicles
     let isMounted = true;
 
     async function loadAvailableVehicles() {
@@ -58,9 +73,7 @@ export default function DashboardPage() {
         }
 
         const vehicles = (await response.json()) as VehicleResponse[];
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setAvailableVehicles(vehicles);
         setMapError(null);
@@ -77,6 +90,82 @@ export default function DashboardPage() {
     }
 
     void loadAvailableVehicles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Get browser location
+    let isMounted = true;
+
+    async function locateAndFetchWeather() {
+      try {
+        setIsLocating(true);
+        const loc = await getBrowserLocation();
+        if (!isMounted) return;
+        setUserLocation(loc);
+        setLocationError(null);
+
+        // Fetch weather from Open-Meteo
+        setIsLoadingWeather(true);
+        const searchParams = new URLSearchParams({
+          latitude: String(loc.latitude),
+          longitude: String(loc.longitude),
+          current_weather: "true",
+          hourly: "relative_humidity_2m",
+          timezone: "auto",
+        });
+        const weatherResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${searchParams.toString()}`);
+        if (!weatherResponse.ok) {
+          throw new Error("Failed to fetch weather");
+        }
+        const data = await weatherResponse.json();
+
+        const temperature = data.current_weather?.temperature ?? null;
+        const windSpeed = data.current_weather?.windspeed ?? null;
+
+        let humidity: number | null = null;
+        try {
+          if (data.hourly?.time && data.hourly?.relative_humidity_2m) {
+            const nowIso = new Date().toISOString().slice(0, 13);
+            const idx = (data.hourly.time as string[]).findIndex((t: string) => t.startsWith(nowIso));
+            if (idx >= 0) {
+              humidity = data.hourly.relative_humidity_2m[idx] ?? null;
+            }
+          }
+        } catch {
+          humidity = null;
+        }
+
+        const description = buildWeatherDescription(data.current_weather?.weathercode);
+
+        if (isMounted) {
+          setWeather({ temperature, windSpeed, humidity, description });
+          setWeatherError(null);
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("Weather/location error", error);
+          setLocationError(
+            "We couldn't access your location. Showing generic Montreal conditions.",
+          );
+          setWeatherError("Unable to load live weather.");
+
+          // Fallback: use downtown Montreal coords
+          const fallback: GeoLocation = { latitude: 45.5019, longitude: -73.5674 };
+          setUserLocation((prev) => prev ?? fallback);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLocating(false);
+          setIsLoadingWeather(false);
+        }
+      }
+    }
+
+    void locateAndFetchWeather();
 
     return () => {
       isMounted = false;
@@ -160,8 +249,18 @@ export default function DashboardPage() {
         </header>
 
         <div className="mb-3 rounded-xl border border-amber-500/70 bg-amber-500/20 px-4 py-2.5 text-amber-300">
-          <p className="text-lg font-semibold">Weather Alert</p>
-          <p className="text-sm">Heavy rain expected in Montreal. Enclosed vehicles recommended.</p>
+          <p className="text-lg font-semibold">
+            {weather.description ?? "Weather"} Alert
+          </p>
+          <p className="text-sm">
+            {isLoadingWeather && "Loading latest conditions..."}
+            {!isLoadingWeather &&
+              (weather.temperature != null
+                ? `Currently ${weather.temperature.toFixed(1)}°C with ${
+                    weather.windSpeed != null ? `${weather.windSpeed.toFixed(0)} km/h` : ""
+                  } winds. Enclosed vehicles recommended in heavy rain or snow.`
+                : "Live weather data is unavailable. Please check your connection.")}
+          </p>
         </div>
 
         <section className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -192,10 +291,18 @@ export default function DashboardPage() {
             <div className="p-3.5">
               <div className="relative h-56 overflow-hidden rounded-lg border border-[#1f2e49] bg-black">
                 <p className="absolute left-3 top-2 text-[11px] font-medium tracking-wide text-gray-300">
-                  Downtown Montreal
+                  {userLocation ? "Your area" : "Downtown Montreal"}
                 </p>
                 <p className="absolute right-3 top-2 text-[11px] text-gray-400">Live availability layer</p>
 
+                {/* User location marker */}
+                {userLocation && (
+                  <div className="absolute inset-0">
+                    <div className="absolute right-4 bottom-4 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.8)]" />
+                  </div>
+                )}
+
+                {/* Vehicle dots */}
                 {mapPoints.map((point) => (
                   <button
                     key={point.id}
@@ -228,13 +335,27 @@ export default function DashboardPage() {
 
           <div className="space-y-3">
             <article className="rounded-xl border border-[#2a354a] bg-[#06142b] p-3.5">
-              <p className="text-4xl font-bold">8C</p>
-              <p className="mt-1 text-lg text-gray-300">Heavy Rain - Montreal</p>
+              <p className="text-4xl font-bold">
+                {weather.temperature != null ? `${weather.temperature.toFixed(0)}°C` : "--"}
+              </p>
+              <p className="mt-1 text-lg text-gray-300">
+                {weather.description ?? "Current Conditions"}
+                {userLocation && " - Your Location"}
+              </p>
               <div className="mt-2 flex items-center gap-4 border-b border-[#2a354a] pb-2 text-base text-gray-200">
-                <span>Humidity 94%</span>
-                <span>Wind 22km/h</span>
+                <span>
+                  Humidity {weather.humidity != null ? `${weather.humidity}%` : "--"}
+                </span>
+                <span>
+                  Wind {weather.windSpeed != null ? `${weather.windSpeed.toFixed(0)} km/h` : "--"}
+                </span>
               </div>
-              <p className="mt-2 text-sm text-amber-300">Bike-sharing restricted. Cars and Metro recommended.</p>
+              <p className="mt-2 text-sm text-amber-300">
+                {isLoadingWeather
+                  ? "Loading live weather for your area..."
+                  : weatherError ??
+                    "Bike-sharing may be restricted in heavy rain or snow. Cars and Metro recommended."}
+              </p>
             </article>
 
             <article className="rounded-xl border border-[#2a354a] bg-[#06142b]">
@@ -257,3 +378,17 @@ export default function DashboardPage() {
   );
 }
 
+function buildWeatherDescription(weatherCode: number | undefined): string | null {
+  if (weatherCode == null) return null;
+  // Basic mapping based on Open-Meteo weather codes
+  if (weatherCode === 0) return "Clear sky";
+  if ([1, 2, 3].includes(weatherCode)) return "Partly cloudy";
+  if ([45, 48].includes(weatherCode)) return "Foggy";
+  if ([51, 53, 55].includes(weatherCode)) return "Drizzle";
+  if ([61, 63, 65].includes(weatherCode)) return "Rain";
+  if ([71, 73, 75, 77].includes(weatherCode)) return "Snow";
+  if ([80, 81, 82].includes(weatherCode)) return "Rain showers";
+  if ([85, 86].includes(weatherCode)) return "Snow showers";
+  if ([95, 96, 99].includes(weatherCode)) return "Thunderstorm";
+  return "Mixed conditions";
+}
