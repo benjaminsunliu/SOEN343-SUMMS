@@ -29,6 +29,10 @@ public class ReservationController {
         this.vehicleRepository = vehicleRepository;
     }
 
+    /*
+    POST /api/vehicles/{vehicleId}/reserve
+    Creates a new vehicle reservation for the given vehicle ID using the provided request data (locations, dates, city) for the currently logged-in user.
+    */
     @PostMapping("/vehicles/{vehicleId}/reserve")
     public ResponseEntity<VehicleReservationResponse> reserveVehicle(
             @PathVariable Long vehicleId,
@@ -55,6 +59,10 @@ public class ReservationController {
         return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation, vehicle));
     }
 
+    /*
+    POST /api/vehicle-reservations/{reservationId}/cancel
+    Cancels an existing vehicle reservation for the given reservation ID, ensuring it belongs to the current user.
+    */
     @PostMapping("/vehicle-reservations/{reservationId}/cancel")
     public ResponseEntity<VehicleReservationResponse> cancelVehicleReservation(
             @PathVariable Long reservationId,
@@ -78,8 +86,10 @@ public class ReservationController {
         return ResponseEntity.ok(VehicleReservationResponse.fromDomain(vehicleReservation, vehicle));
     }
 
-
-
+    /*
+    GET /api/users/me/vehicle-reservations
+    Retrieves all vehicle reservations associated with the currently logged-in user.
+    */
     @GetMapping("/users/me/vehicle-reservations")
     public ResponseEntity<List<VehicleReservationResponse>> getUserVehicleReservations(
             @SessionAttribute("user") UserEntity user
@@ -106,6 +116,10 @@ public class ReservationController {
         return ResponseEntity.ok(response);
     }
 
+    /*
+    GET /api/vehicle-reservations/{reservationId}
+    Retrieves a specific vehicle reservation by its ID, including associated vehicle details.
+    */
     @GetMapping("/vehicle-reservations/{reservationId}")
     public ResponseEntity<VehicleReservationResponse> getVehicleReservationById(
             @PathVariable Long reservationId
