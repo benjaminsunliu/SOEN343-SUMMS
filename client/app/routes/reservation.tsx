@@ -1,5 +1,13 @@
 import { SiteNav } from "../root";
+import { useLocation } from "react-router";
 import type { Route } from "./+types/reservation";
+
+interface ReservationState {
+  selectedVehicleName?: string;
+  selectedVehicleProvider?: string;
+  selectedVehicleCondition?: string;
+  selectedVehiclePrice?: string;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,6 +17,13 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function ReservationPage() {
+  const location = useLocation();
+  const selectedState = (location.state as ReservationState | null) ?? {};
+  const selectedVehicleName = selectedState.selectedVehicleName ?? "City Bike #B-41";
+  const selectedVehicleProvider = selectedState.selectedVehicleProvider ?? "BIXI Montreal";
+  const selectedVehicleCondition = selectedState.selectedVehicleCondition ?? "Excellent";
+  const selectedVehiclePrice = selectedState.selectedVehiclePrice ?? "$3.50";
+
   const routeStops = [
     {
       label: "From",
@@ -37,9 +52,11 @@ export default function ReservationPage() {
 
               <div className="space-y-3 p-5">
                 <div className="rounded-xl bg-[#1a2a45] px-4 py-3.5">
-                  <p className="text-xl font-bold leading-tight">Selected: City Bike #B-41</p>
-                  <p className="text-base text-gray-300">BIXI Montreal - Excellent condition</p>
-                  <p className="text-right text-3xl font-bold leading-none text-cyan-400">$3.50</p>
+                  <p className="text-xl font-bold leading-tight">Selected: {selectedVehicleName}</p>
+                  <p className="text-base text-gray-300">
+                    {selectedVehicleProvider} - {selectedVehicleCondition} condition
+                  </p>
+                  <p className="text-right text-3xl font-bold leading-none text-cyan-400">{selectedVehiclePrice}</p>
                 </div>
 
                 {routeStops.map((stop) => (

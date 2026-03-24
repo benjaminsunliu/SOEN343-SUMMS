@@ -1,5 +1,19 @@
 import { SiteNav } from "../root";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/vehicle-search";
+
+interface SearchVehicle {
+  id: number;
+  type: "Bike" | "Scooter" | "Car";
+  name: string;
+  distance: string;
+  energy: string;
+  provider: string;
+  price: string;
+  available: boolean;
+  station: string;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -9,56 +23,100 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function VehicleSearchPage() {
-  const vehicles = [
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  const vehicles: SearchVehicle[] = [
     {
+      id: 101,
+      type: "Bike",
       name: "City Bike #B-41",
       distance: "0.2 km away",
       energy: "Full charge",
       provider: "BIXI Montreal",
       price: "$3.50/hr",
       available: true,
+      station: "Peel & Sainte-Catherine",
     },
     {
+      id: 102,
+      type: "Bike",
       name: "E-Bike #E-12",
       distance: "0.5 km away",
       energy: "82%",
       provider: "BIXI Montreal",
       price: "$5.00/hr",
       available: true,
+      station: "McGill Metro",
     },
     {
+      id: 103,
+      type: "Bike",
       name: "City Bike #B-89",
       distance: "0.6 km away",
       energy: "Full charge",
       provider: "BIXI Montreal",
       price: "Unavailable",
       available: false,
+      station: "Old Port",
     },
     {
+      id: 201,
+      type: "Scooter",
       name: "Scooter #S-07",
       distance: "0.8 km away",
       energy: "91%",
       provider: "Lime",
       price: "$4.00/hr",
       available: true,
+      station: "Place-des-Arts",
     },
     {
+      id: 301,
+      type: "Car",
       name: "Toyota Corolla",
       distance: "1.1 km away",
       energy: "Full tank",
       provider: "Communauto",
       price: "$12.00/hr",
       available: true,
+      station: "Ville-Marie",
     },
     {
+      id: 302,
+      type: "Car",
       name: "Honda Civic",
       distance: "1.4 km away",
       energy: "Electric",
       provider: "Communauto",
       price: "$13.50/hr",
       available: true,
+      station: "Quartier Latin",
     },
   ];
+
+  const defaultVehicleId = vehicles.find((vehicle) => vehicle.available)?.id ?? vehicles[0].id;
+  const [selectedVehicleId, setSelectedVehicleId] = useState(defaultVehicleId);
+
+  useEffect(() => {
+    const vehicleIdFromQuery = Number(searchParams.get("vehicleId"));
+    if (!Number.isFinite(vehicleIdFromQuery)) {
+      return;
+    }
+
+    const matchingVehicle = vehicles.find((vehicle) => vehicle.id === vehicleIdFromQuery);
+    if (matchingVehicle) {
+      setSelectedVehicleId(matchingVehicle.id);
+    }
+  }, [searchParams, vehicles]);
+
+  const selectedVehicle = useMemo(
+    () => vehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? vehicles[0],
+    [selectedVehicleId, vehicles],
+  );
+
+  const reservePrice = selectedVehicle.price.replace("/hr", "");
+  const conditionLabel = selectedVehicle.energy === "Full charge" ? "Excellent" : "Good";
 
   return (
     <>
@@ -150,7 +208,23 @@ export default function VehicleSearchPage() {
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {vehicles.map((vehicle) => (
-                <article key={vehicle.name} className="relative rounded-2xl border border-[#23324c] bg-[#06142b] p-3.5">
+                <article
+                  key={vehicle.id}
+                  className={`relative cursor-pointer rounded-2xl border bg-[#06142b] p-3.5 transition-colors ${selectedVehicle.id === vehicle.id
+                    ? "border-cyan-400"
+                    : "border-[#23324c] hover:border-[#3f5374]"
+                    }`}
+                  onClick={() => setSelectedVehicleId(vehicle.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setSelectedVehicleId(vehicle.id);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Select ${vehicle.name}`}
+                >
                   <span
                     className={`absolute right-3 top-3 h-3 w-3 rounded-full ${vehicle.available ? "bg-green-400" : "bg-red-400"}`}
                     aria-hidden="true"
@@ -169,28 +243,47 @@ export default function VehicleSearchPage() {
 
             <article className="rounded-2xl border border-[#2a354a] bg-[#06142b]">
               <div className="flex items-center justify-between border-b border-[#2a354a] px-4 py-3">
-                <h3 className="text-xl font-semibold">Selected: City Bike #B-41</h3>
-                <span className="rounded-md bg-green-500/25 px-3 py-1 text-sm font-semibold text-green-400">Bike</span>
+                <h3 className="text-xl font-semibold">Selected: {selectedVehicle.name}</h3>
+                <span
+                  className={`rounded-md px-3 py-1 text-sm font-semibold ${selectedVehicle.available
+                    ? "bg-green-500/25 text-green-400"
+                    : "bg-red-500/25 text-red-300"
+                    }`}
+                >
+                  {selectedVehicle.type}
+                </span>
               </div>
 
               <div className="flex flex-col gap-3 px-4 py-4 md:flex-row md:items-end md:justify-between">
                 <div className="space-y-1 text-base text-gray-200">
-                  <p>Station: Peel & Sainte-Catherine</p>
-                  <p>Condition: Excellent</p>
-                  <p>Provider: BIXI Montreal</p>
+                  <p>Station: {selectedVehicle.station}</p>
+                  <p>Condition: {conditionLabel}</p>
+                  <p>Provider: {selectedVehicle.provider}</p>
                 </div>
 
                 <p className="text-4xl font-bold text-cyan-400">
-                  $3.50<span className="text-gray-400">/hr</span>
+                  {reservePrice}
+                  {selectedVehicle.price.includes("/hr") && <span className="text-gray-400">/hr</span>}
                 </p>
               </div>
 
               <div className="px-4 pb-4">
                 <button
                   type="button"
+                  onClick={() =>
+                    navigate("/reservation", {
+                      state: {
+                        selectedVehicleName: selectedVehicle.name,
+                        selectedVehicleProvider: selectedVehicle.provider,
+                        selectedVehicleCondition: conditionLabel,
+                        selectedVehiclePrice: reservePrice,
+                      },
+                    })
+                  }
+                  disabled={!selectedVehicle.available}
                   className="w-full rounded-xl bg-cyan-400 px-4 py-2.5 text-xl font-semibold text-slate-900 transition hover:bg-cyan-300"
                 >
-                  Reserve this Vehicle
+                  {selectedVehicle.available ? "Reserve this Vehicle" : "Vehicle Unavailable"}
                 </button>
               </div>
             </article>
