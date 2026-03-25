@@ -19,4 +19,10 @@ public class GlobalExceptionHandler {
     public Map<String, String> handleGeneral(Exception ex) {
         return Map.of("message", ex.getMessage());
     }
+
+    @ExceptionHandler(VehicleUnavailableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Map<String, String> handleVehicleUnavailable(VehicleUnavailableException ex) {
+        return Map.of("message", ex.getMessage());
+    }
 }

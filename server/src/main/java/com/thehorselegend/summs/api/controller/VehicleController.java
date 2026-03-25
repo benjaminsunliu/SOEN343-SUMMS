@@ -2,6 +2,8 @@ package com.thehorselegend.summs.api.controller;
 
 import com.thehorselegend.summs.api.dto.*;
 import com.thehorselegend.summs.application.service.VehicleService;
+import com.thehorselegend.summs.application.service.VehicleSearchService;
+import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -26,9 +28,11 @@ import java.util.List;
 public class VehicleController {
 
     private final VehicleService vehicleService;
+    private VehicleSearchService vehicleSearchService;
 
-    public VehicleController(VehicleService vehicleService) {
+    public VehicleController(VehicleService vehicleService, VehicleSearchService vehicleSearchService) {
         this.vehicleService = vehicleService;
+        this.vehicleSearchService = vehicleSearchService;
     }
 
     // NOTE: REST API Names are up for discussion.
@@ -118,5 +122,28 @@ public class VehicleController {
     @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
     public void deleteVehicle(@PathVariable Long vehicleId) {
         vehicleService.deleteVehicle(vehicleId);
+    }
+
+    // Test with: http://localhost:8080/api/vehicles/nearby?lat=45.5&lon=-73.5&radiusKm=500<or 1000>
+    @GetMapping("nearby")
+    public List<Vehicle> getNearbyVehicles(
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(defaultValue = "5") double radiusKm
+    ) {
+        return vehicleSearchService.findNearbyVehicles(lat, lon, radiusKm);
+    }
+
+    // Context-aware (good/bad weather and no type) Test with: http://localhost:8080/api/vehicles/search?lat=45.5&lon=-73.5&radiusKm=500
+    // With context-aware, if weather is severe, then type filtering returns error message: "Cannot display bicycle/scooter as the weather is severe"
+    // Good weather! use type filter to test: http://localhost:8080/api/vehicles/search?lat=45.5&lon=-73.5&radiusKm=500&type=bicycle
+    @GetMapping("search")
+    public List<Vehicle> searchVehicles(
+            @RequestParam double lat,
+            @RequestParam double lon,
+            @RequestParam(defaultValue = "5") double radiusKm,
+            @RequestParam(required = false) String type
+    ) {
+        return vehicleSearchService.searchVehicles(lat, lon, radiusKm, type);
     }
 }
