@@ -4,6 +4,8 @@ import com.thehorselegend.summs.api.dto.EndTripRequest;
 import com.thehorselegend.summs.api.dto.LocationDto;
 import com.thehorselegend.summs.api.dto.StartTripRequest;
 import com.thehorselegend.summs.api.dto.TripResponse;
+import com.thehorselegend.summs.application.service.payment.IPaymentService;
+import com.thehorselegend.summs.application.service.payment.PaymentResult;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Car;
 import com.thehorselegend.summs.domain.vehicle.Location;
@@ -53,6 +55,9 @@ class RentalLifecycleServiceTest {
     @Mock
     private ReservationRepository reservationRepository;
 
+        @Mock
+        private IPaymentService paymentService;
+
     @InjectMocks
     private RentalLifecycleService rentalLifecycleService;
 
@@ -93,6 +98,8 @@ class RentalLifecycleServiceTest {
         when(vehicleRepository.findById(VEHICLE_ID)).thenReturn(Optional.of(reservedVehicleEntity));
         when(tripRepository.findByVehicleIdAndEndTimeIsNull(VEHICLE_ID)).thenReturn(Optional.empty());
         when(tripRepository.findByCitizenIdAndEndTimeIsNull(CITIZEN_ID)).thenReturn(Optional.empty());
+        when(paymentService.processPayment("Tokenized Checkout", "PAY-READY", 1.00))
+                .thenReturn(PaymentResult.success("PAY-READY"));
         when(vehicleRepository.save(any(VehicleEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tripRepository.save(any(TripEntity.class))).thenAnswer(invocation -> {
             TripEntity trip = invocation.getArgument(0);

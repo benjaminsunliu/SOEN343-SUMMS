@@ -4,6 +4,8 @@ import com.thehorselegend.summs.api.dto.EndTripRequest;
 import com.thehorselegend.summs.api.dto.LocationDto;
 import com.thehorselegend.summs.api.dto.StartTripRequest;
 import com.thehorselegend.summs.api.dto.TripResponse;
+import com.thehorselegend.summs.application.service.payment.IPaymentService;
+import com.thehorselegend.summs.application.service.payment.PaymentResult;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.trip.Trip;
@@ -42,14 +44,17 @@ public class RentalLifecycleService {
     private final TripRepository tripRepository;
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
+    private final IPaymentService paymentService;
 
     public RentalLifecycleService(
             TripRepository tripRepository,
             VehicleRepository vehicleRepository,
-            ReservationRepository reservationRepository) {
+            ReservationRepository reservationRepository,
+            IPaymentService paymentService) {
         this.tripRepository = tripRepository;
         this.vehicleRepository = vehicleRepository;
         this.reservationRepository = reservationRepository;
+        this.paymentService = paymentService;
     }
 
     @Transactional
@@ -155,7 +160,12 @@ public class RentalLifecycleService {
     }
 
     private void authorizePayment(String paymentAuthorizationCode) {
-        if (!paymentAuthorizationCode.startsWith("PAY-")) {
+        if (paymentAuthorizationCode == null || !paymentAuthorizationCode.startsWith("PAY-")) {
+            throw new IllegalArgumentException("Payment authorization failed.");
+        }
+
+        PaymentResult result = paymentService.processPayment("Tokenized Checkout", paymentAuthorizationCode, 1.00);
+        if (!result.successful()) {
             throw new IllegalArgumentException("Payment authorization failed.");
         }
     }
