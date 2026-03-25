@@ -142,7 +142,7 @@ export default function TripSummaryPage() {
                 Your trip has been completed successfully. Your vehicle has been returned to our system and may be available for other customers.
               </p>
               <a
-                href="/reservations"
+                href="/reservation"
                 className="inline-block rounded-lg bg-cyan-600 text-white px-6 py-2.5 font-semibold transition hover:bg-cyan-500"
               >
                 Book Another Trip
