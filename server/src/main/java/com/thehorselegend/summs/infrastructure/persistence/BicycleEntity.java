@@ -19,6 +19,6 @@ public class BicycleEntity extends VehicleEntity {
             LocationEmbeddable location,
             Long providerId,
             Double costPerMinute) {
-        super(id, VehicleType.BICYCLE, status, location, providerId, costPerMinute);
+        super(id, status, location, providerId, costPerMinute);
     }
 }

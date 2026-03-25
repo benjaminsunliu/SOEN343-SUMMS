@@ -211,16 +211,24 @@ public class VehicleService {
         String licensePlate = null;
         Integer seatingCapacity = null;
 
-        if (vehicle instanceof Scooter scooter) {
-            maxRange = scooter.getMaxRange();
-        } else if (vehicle instanceof Car car) {
+        String type;
+        if (vehicle instanceof Car car) {
+            type = VehicleType.CAR.name();
             licensePlate = car.getLicensePlate();
             seatingCapacity = car.getSeatingCapacity();
+        } else if (vehicle instanceof Scooter scooter) {
+            type = VehicleType.SCOOTER.name();
+            maxRange = scooter.getMaxRange();
+        } else if (vehicle instanceof Bicycle) {
+            type = VehicleType.BICYCLE.name();
+        } else {
+            type = null;
         }
+
 
         return new VehicleResponse(
                 vehicle.getId(),
-                vehicle.getType().name(),
+                type,
                 vehicle.getStatus().name(),
                 locationDto,
                 vehicle.getProviderId(),
