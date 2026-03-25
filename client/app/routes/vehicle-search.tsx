@@ -19,7 +19,7 @@ const VEHICLE_TYPE_OPTIONS: Array<{
   label: string;
 }> = [
   { value: "ALL", label: "All" },
-  { value: "Bike", label: "Bike" },
+  { value: "Bicycle", label: "Bicycle" },
   { value: "Scooter", label: "Scooter" },
   { value: "Car", label: "Car" },
 ];
@@ -46,73 +46,80 @@ export default function VehicleSearchPage() {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadAvailableVehicles() {
-      try {
-        const response = await apiFetch("/api/vehicles/status/AVAILABLE");
-        if (!response.ok) {
-          throw new Error(`Failed to fetch vehicles (${response.status})`);
-        }
 
-        const data = (await response.json()) as VehicleApiResponse[];
-        if (!isMounted) {
-          return;
-        }
+      async function loadAvailableVehicles() {
+          if (!userLocation) return; // wait for location
 
-        const mappedVehicles = mapVehiclesToCatalog(data);
-        if (mappedVehicles.length === 0) {
-          setVehicles([]);
-          setVehicleError("No live vehicles found.");
-          return;
-        }
+          setIsLoadingVehicles(true);
 
-        setVehicles(mappedVehicles);
-        setVehicleError(null);
-      } catch {
-        if (isMounted) {
-          setVehicles([]);
-          setVehicleError("Unable to load live vehicles.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingVehicles(false);
-        }
+          try {
+              // Build URL with query parameters
+              const typeFilter =
+                  selectedVehicleType !== "ALL" ? selectedVehicleType.toLowerCase() : "";
+              const url = `/api/vehicles/search?lat=${userLocation.latitude}&lon=${userLocation.longitude}&radiusKm=500${typeFilter ? `&type=${typeFilter}` : ""}`;
+
+              const response = await apiFetch(url);
+
+              if (!response.ok) {
+                  throw new Error(`Failed to fetch vehicles (${response.status})`);
+              }
+
+              const data = (await response.json()) as VehicleApiResponse[];
+
+              if (!isMounted) return;
+
+              if (data.length === 0) {
+                  setVehicles([]);
+                  setVehicleError(
+                      typeFilter
+                          ? `No ${selectedVehicleType} vehicles available nearby.`
+                          : "No vehicles found nearby."
+                  );
+                  return;
+              }
+
+              setVehicles(mapVehiclesToCatalog(data));
+              setVehicleError(null);
+          } catch (err) {
+              if (!isMounted) return;
+              setVehicles([]);
+              setVehicleError("Unable to load live vehicles.");
+          } finally {
+              if (isMounted) setIsLoadingVehicles(false);
+          }
       }
-    }
 
-    void loadAvailableVehicles();
+      void loadAvailableVehicles();
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+      return () => {
+          isMounted = false;
+      };
+  }, [userLocation, selectedVehicleType]);
 
   useEffect(() => {
     let isMounted = true;
 
-    async function locateUser() {
-      try {
-        const location = await getBrowserLocation();
-        if (!isMounted) {
-          return;
-        }
+      async function locateUser() {
+          try {
+              const location = await getBrowserLocation();
+              if (!isMounted) return;
 
-        setUserLocation(location);
-        setLocationError(null);
-      } catch {
-        if (isMounted) {
-          setUserLocation(null);
-          setLocationError(
-            "Location unavailable. Enable browser location to show your position on the map.",
-          );
-        }
+              setUserLocation(location);
+              setLocationError(null);
+          } catch {
+              if (!isMounted) return;
+              setUserLocation(null);
+              setLocationError(
+                  "Location unavailable. Enable browser location to show your position on the map."
+              );
+          }
       }
-    }
 
-    void locateUser();
+      void locateUser();
 
-    return () => {
-      isMounted = false;
-    };
+      return () => {
+          isMounted = false;
+      };
   }, []);
 
   useEffect(() => {
@@ -477,9 +484,9 @@ function hasCoordinates(
 
 function markerKindForVehicleType(
   type: VehicleCatalogItem["type"],
-): "bike" | "car" | "scooter" {
-  if (type === "Bike") {
-    return "bike";
+): "bicycle" | "car" | "scooter" {
+  if (type === "Bicycle") {
+    return "bicycle";
   }
   if (type === "Scooter") {
     return "scooter";

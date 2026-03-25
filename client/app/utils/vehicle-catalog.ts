@@ -17,7 +17,7 @@ export interface VehicleApiResponse {
 
 export interface VehicleCatalogItem {
   id: number;
-  type: "Bike" | "Scooter" | "Car";
+  type: "Bicycle" | "Scooter" | "Car";
   rawType: string;
   name: string;
   provider: string;
@@ -74,8 +74,8 @@ export function mapVehicleToCatalog(
 
 function normalizeType(type: string): VehicleCatalogItem["type"] {
   const normalized = type.toUpperCase();
-  if (normalized === "BICYCLE" || normalized === "BIKE") {
-    return "Bike";
+  if (normalized === "BICYCLE") {
+    return "Bicycle";
   }
   if (normalized === "SCOOTER") {
     return "Scooter";
@@ -95,8 +95,8 @@ function formatName(
   vehicle: VehicleApiResponse,
   type: VehicleCatalogItem["type"],
 ): string {
-  if (type === "Bike") {
-    return `Bike #${vehicle.id}`;
+  if (type === "Bicycle") {
+    return `Bicycle #${vehicle.id}`;
   }
   if (type === "Scooter") {
     return `Scooter #${vehicle.id}`;
@@ -125,7 +125,7 @@ function formatEnergy(
   vehicle: VehicleApiResponse,
   type: VehicleCatalogItem["type"],
 ): string {
-  if (type === "Bike") {
+  if (type === "Bicycle") {
     return "Human-powered";
   }
   if (type === "Scooter") {

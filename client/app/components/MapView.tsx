@@ -3,7 +3,7 @@ import { useEffect, useState, type ComponentType } from "react";
 // Local alias for coordinates instead of importing from Leaflet types
 type LatLngExpression = [number, number] | { lat: number; lng: number };
 
-export type MarkerKind = "user" | "bike" | "car" | "scooter" | "vehicle";
+export type MarkerKind = "user" | "bicycle" | "car" | "scooter" | "vehicle";
 
 export interface MapMarker {
   position: LatLngExpression;
@@ -62,7 +62,7 @@ export function MapView({ center, zoom = 13, markers = [], className }: MapViewP
 
       const markerIcons = {
         user: makeIcon("📍", "#22d3ee"),
-        bike: makeIcon("🚲", "#22c55e"),
+        bicycle: makeIcon("🚲", "#22c55e"),
         scooter: makeIcon("🛴", "#f59e0b"),
         car: makeIcon("🚗", "#3b82f6"),
         vehicle: makeIcon("●", "#a78bfa"),

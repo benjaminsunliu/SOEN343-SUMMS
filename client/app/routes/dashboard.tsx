@@ -252,10 +252,10 @@ export default function DashboardPage() {
   }, [availableVehicles, hasPreciseUserLocation, userLocation]);
 
   const vehiclesByType = useMemo(() => {
-    const counts = { bikes: 0, cars: 0, scooters: 0 };
+    const counts = { bicycles: 0, cars: 0, scooters: 0 };
     availableVehicles.forEach((vehicle) => {
       if (vehicle.type === "BICYCLE") {
-        counts.bikes += 1;
+        counts.bicycles += 1;
       } else if (vehicle.type === "CAR") {
         counts.cars += 1;
       } else {
@@ -367,7 +367,7 @@ export default function DashboardPage() {
                  )}
                </div>
                <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                 <span className="rounded-md bg-black px-3 py-1 text-cyan-400">Bike: {vehiclesByType.bikes}</span>
+                 <span className="rounded-md bg-black px-3 py-1 text-cyan-400">Bicycle: {vehiclesByType.bicycles}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-blue-500">Car: {vehiclesByType.cars}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-red-400">Scooter: {vehiclesByType.scooters}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-gray-300">Available: {availableVehicles.length}</span>
@@ -396,7 +396,7 @@ export default function DashboardPage() {
                 {isLoadingWeather
                   ? "Loading live weather for your area..."
                   : weatherError ??
-                    "Bike-sharing may be restricted in heavy rain or snow. Cars and Metro recommended."}
+                    "Bicycle-sharing may be restricted in heavy rain or snow. Cars and Metro recommended."}
               </p>
             </article>
 
@@ -461,10 +461,10 @@ function buildWeatherDescription(weatherCode: number | undefined): string | null
 
 function markerKindForVehicleType(
   type: string,
-): "bike" | "car" | "scooter" | "vehicle" {
+): "bicycle" | "car" | "scooter" | "vehicle" {
   const normalizedType = type.toUpperCase();
-  if (normalizedType === "BICYCLE" || normalizedType === "BIKE") {
-    return "bike";
+  if (normalizedType === "BICYCLE") {
+    return "bicycle";
   }
   if (normalizedType === "SCOOTER") {
     return "scooter";
