@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { SiteNav } from "../root";
 import { apiFetch } from "../utils/api";
+import { setActiveTrip } from "../utils/trips";
 import type { Route } from "./+types/my-reservations";
 
 interface ReservationLocation {
@@ -27,9 +28,11 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function MyReservationsPage() {
+  const navigate = useNavigate();
   const [reservations, setReservations] = useState<ReservationResponse[]>([]);
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [cancelingReservationIds, setCancelingReservationIds] = useState<number[]>([]);
+  const [startingReservationIds, setStartingReservationIds] = useState<number[]>([]);
   const [reservationError, setReservationError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -53,7 +56,9 @@ export default function MyReservationsPage() {
           return;
         }
 
-        setReservations([...data].sort((a, b) => b.reservationId - a.reservationId));
+        const activeStatuses = new Set(["PENDING", "CONFIRMED"]);
+        const filtered = data.filter((r) => activeStatuses.has(r.status.toUpperCase()));
+        setReservations([...filtered].sort((a, b) => b.reservationId - a.reservationId));
         setReservationError(null);
       } catch (error) {
         if (isMounted) {
@@ -75,6 +80,44 @@ export default function MyReservationsPage() {
       isMounted = false;
     };
   }, []);
+
+  const handleStartTrip = async (reservationId: number) => {
+    setActionError(null);
+    setActionMessage(null);
+    setStartingReservationIds((prev) => [...prev, reservationId]);
+
+    try {
+      const response = await apiFetch(`/api/rentals/${reservationId}/start`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const message = await readErrorMessage(response, "Could not start trip.");
+        setActionError(message);
+        return;
+      }
+
+      const trip = (await response.json()) as {
+        tripId: number;
+        vehicleId: number;
+        citizenId: number;
+        startTime: string;
+      };
+
+      setActiveTrip({
+        tripId: trip.tripId,
+        vehicleId: trip.vehicleId,
+        citizenId: trip.citizenId,
+        startTime: trip.startTime,
+      });
+
+      navigate("/trips/active");
+    } catch {
+      setActionError("Network error while starting trip.");
+    } finally {
+      setStartingReservationIds((prev) => prev.filter((id) => id !== reservationId));
+    }
+  };
 
   const handleCancelReservation = async (reservationId: number) => {
     setActionError(null);
@@ -182,18 +225,26 @@ export default function MyReservationsPage() {
                           {reservation.endLocation.longitude.toFixed(4)})
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="flex flex-col items-end gap-2">
                         <p
                           className={`rounded-md px-3 py-1 text-xs font-semibold ${statusBadgeClass(reservation.status)}`}
                         >
                           {reservation.status}
                         </p>
+                        <button
+                          type="button"
+                          onClick={() => void handleStartTrip(reservation.reservationId)}
+                          disabled={startingReservationIds.includes(reservation.reservationId)}
+                          className="rounded-md bg-cyan-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {startingReservationIds.includes(reservation.reservationId) ? "Starting..." : "Start Trip"}
+                        </button>
                         {isCancelable && (
                           <button
                             type="button"
                             onClick={() => void handleCancelReservation(reservation.reservationId)}
                             disabled={isCanceling}
-                            className="mt-2 rounded-md border border-red-400 px-2.5 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                            className="rounded-md border border-red-400 px-2.5 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {isCanceling ? "Canceling..." : "Cancel"}
                           </button>

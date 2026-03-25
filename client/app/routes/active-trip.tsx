@@ -3,8 +3,8 @@ import { useNavigate } from "react-router";
 import { SiteNav } from "../root";
 import { apiFetch } from "../utils/api";
 import { getAuthUser } from "../utils/auth";
-import { clearActiveTrip, getActiveTrip, setActiveTrip } from "../utils/trips";
-import ActiveTrip, { type ActiveTripViewModel } from "../components/active-trip";
+import { clearActiveTrip, setActiveTrip } from "../utils/trips";
+import ActiveTrip, { type ActiveTripViewModel } from "../components/active-trip-panel";
 import type { Route } from "./+types/active-trip";
 
 export function meta({}: Route.MetaArgs) {
@@ -22,7 +22,6 @@ interface TripApiResponse extends ActiveTripViewModel {
 export default function ActiveTripPage() {
   const navigate = useNavigate();
   const authUser = useMemo(() => getAuthUser(), []);
-  const localActiveTrip = useMemo(() => getActiveTrip(), []);
 
   const [trip, setTrip] = useState<ActiveTripViewModel | null>(null);
   const [latitude, setLatitude] = useState("45.50");
@@ -42,33 +41,28 @@ export default function ActiveTripPage() {
 
       try {
         const response = await apiFetch(`/api/trips/active/${authUser.id}`);
-        const payload = (await response.json()) as TripApiResponse | { message?: string };
-
         if (!response.ok) {
-          const errorMessage = "message" in payload && payload.message
-            ? payload.message
-            : "No active trip found.";
-          throw new Error(errorMessage);
+          setIsLoading(false);
+          return;
         }
 
-        const activeTrip = payload as TripApiResponse;
-        setTrip({
+        const activeTrip = (await response.json()) as TripApiResponse;
+        const tripData: ActiveTripViewModel = {
           tripId: activeTrip.tripId,
           vehicleId: activeTrip.vehicleId,
           citizenId: activeTrip.citizenId,
           startTime: activeTrip.startTime,
           vehicleStatus: activeTrip.vehicleStatus,
-        });
-
+        };
+        setTrip(tripData);
         setActiveTrip({
           tripId: activeTrip.tripId,
           vehicleId: activeTrip.vehicleId,
           citizenId: activeTrip.citizenId,
           startTime: activeTrip.startTime,
         });
-      } catch (caught) {
-        const messageToShow = caught instanceof Error ? caught.message : "No active trip found.";
-        setError(messageToShow);
+      } catch {
+        // No active trip
       } finally {
         setIsLoading(false);
       }
@@ -80,10 +74,8 @@ export default function ActiveTripPage() {
   async function handleEndTrip(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const sourceTrip = trip ?? localActiveTrip;
-    if (!sourceTrip) {
-      setError("No active trip found. Start a trip first.");
-      setMessage(null);
+    if (!trip) {
+      setError("No active trip found.");
       return;
     }
 
@@ -91,7 +83,6 @@ export default function ActiveTripPage() {
     const parsedLongitude = Number(longitude);
     if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)) {
       setError("Please enter valid drop-off coordinates.");
-      setMessage(null);
       return;
     }
 
@@ -100,7 +91,7 @@ export default function ActiveTripPage() {
     setMessage(null);
 
     try {
-      const response = await apiFetch(`/api/trips/${sourceTrip.tripId}/end`, {
+      const response = await apiFetch(`/api/trips/${trip.tripId}/end`, {
         method: "POST",
         body: JSON.stringify({
           dropOffLocation: {
@@ -120,11 +111,9 @@ export default function ActiveTripPage() {
 
       const endedTrip = payload as TripApiResponse;
       clearActiveTrip();
-      setMessage("Trip ended successfully.");
       navigate(`/trips/summary/${endedTrip.tripId}`);
     } catch (caught) {
-      const messageToShow = caught instanceof Error ? caught.message : "Unable to end trip.";
-      setError(messageToShow);
+      setError(caught instanceof Error ? caught.message : "Unable to end trip.");
     } finally {
       setIsEnding(false);
     }
@@ -133,33 +122,65 @@ export default function ActiveTripPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 p-4 bg-gray-900 min-h-screen">
-        <h1 className="text-2xl font-semibold mb-2 text-white">Active Trip</h1>
+      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+        <header className="mb-4 border-b border-[#253047] pb-3">
+          <h1 className="text-2xl font-bold tracking-tight text-cyan-400">Active Trip</h1>
+        </header>
 
-        {isLoading && <p className="text-gray-400">Loading active trip...</p>}
-
-        {!isLoading && trip && (
-          <ActiveTrip
-            trip={trip}
-            latitude={latitude}
-            longitude={longitude}
-            isEnding={isEnding}
-            onLatitudeChange={setLatitude}
-            onLongitudeChange={setLongitude}
-            onEndTrip={handleEndTrip}
-          />
+        {isLoading && (
+          <div className="rounded-xl border border-gray-700 bg-gray-950 p-5 text-center">
+            <p className="text-gray-300">Loading...</p>
+          </div>
         )}
 
         {!isLoading && !trip && (
-          <p className="text-gray-400">No active trip found.</p>
+          <div className="rounded-xl border border-amber-500/70 bg-amber-500/20 px-5 py-4">
+            <p className="text-amber-200">
+              No active trip found. Go to{" "}
+              <a href="/my-reservations" className="underline text-amber-100 hover:text-white">My Reservations</a>{" "}
+              and click "Start Trip" on a confirmed reservation.
+            </p>
+          </div>
         )}
 
-        <p className="mt-4 text-gray-400">
-          Valid drop-off zones are simulated near Montreal Downtown, Verdun, and Plateau.
-        </p>
+        {!isLoading && trip && (
+          <>
+            <section className="mb-5 space-y-4">
+              <ActiveTrip
+                trip={trip}
+                latitude={latitude}
+                longitude={longitude}
+                isEnding={isEnding}
+                onLatitudeChange={setLatitude}
+                onLongitudeChange={setLongitude}
+                onEndTrip={handleEndTrip}
+              />
 
-        {message && <p className="mt-4 text-green-300">{message}</p>}
-        {error && <p className="mt-4 text-red-300">{error}</p>}
+              <div className="rounded-xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
+                <h3 className="text-base font-semibold text-gray-300 mb-2">Valid Drop-off Zones</h3>
+                <p className="text-sm text-gray-400">
+                  You can end your trip in simulated valid drop-off zones near:
+                </p>
+                <ul className="mt-2 text-sm text-gray-400 list-disc list-inside space-y-1">
+                  <li>Montreal Downtown (45.49°N - 45.53°N, 73.54°W - 73.59°W)</li>
+                  <li>Verdun (45.44°N - 45.47°N, 73.55°W - 73.60°W)</li>
+                  <li>Plateau (45.52°N - 45.55°N, 73.56°W - 73.61°W)</li>
+                </ul>
+              </div>
+            </section>
+
+            {message && (
+              <div className="mb-5 rounded-xl border border-green-500/70 bg-green-500/20 px-4 py-3 text-sm text-green-200">
+                {message}
+              </div>
+            )}
+            {error && (
+              <div className="mb-5 rounded-xl border border-red-500/70 bg-red-500/20 px-4 py-3 text-sm text-red-200">
+                {error}
+              </div>
+            )}
+          </>
+        )}
       </main>
     </>
   );

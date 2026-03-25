@@ -90,63 +90,111 @@ export default function VehicleReturnPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 p-4 bg-gray-900 min-h-screen">
-        <h1 className="text-2xl font-semibold mb-2 text-white">Vehicle Return</h1>
+      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+        <header className="mb-4 border-b border-[#253047] pb-3">
+          <h1 className="text-2xl font-bold tracking-tight text-cyan-400">Vehicle Return</h1>
+        </header>
 
         {!activeTrip && (
-          <p className="text-gray-400">No active trip found in this browser session.</p>
+          <div className="rounded-xl border border-amber-500/70 bg-amber-500/20 px-5 py-4">
+            <p className="text-amber-200">
+              No active trip found in this browser session. Use the <strong>Active Trip</strong> page to manage your current rental.
+            </p>
+          </div>
         )}
 
         {activeTrip && (
-          <form
-            className="max-w-md space-y-4 bg-gray-950 border border-gray-800 rounded-xl p-4"
-            onSubmit={handleEndTrip}
-          >
-            <p className="text-sm text-gray-300">Active Trip ID: {activeTrip.tripId}</p>
-            <p className="text-sm text-gray-300">Vehicle ID: {activeTrip.vehicleId}</p>
+          <section className="max-w-2xl space-y-5">
+            {/* Trip Info Card */}
+            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
+              <h3 className="text-lg font-semibold text-cyan-400 mb-3">Active Trip Details</h3>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg bg-gray-900 p-3">
+                  <p className="text-xs uppercase tracking-widest text-gray-400">Trip ID</p>
+                  <p className="text-lg font-semibold text-white">{activeTrip.tripId}</p>
+                </div>
+                <div className="rounded-lg bg-gray-900 p-3">
+                  <p className="text-xs uppercase tracking-widest text-gray-400">Vehicle ID</p>
+                  <p className="text-lg font-semibold text-white">{activeTrip.vehicleId}</p>
+                </div>
+              </div>
+            </article>
 
-            <label className="block text-sm text-gray-300" htmlFor="dropoff-latitude">
-              Drop-off Latitude
-            </label>
-            <input
-              id="dropoff-latitude"
-              type="number"
-              step="any"
-              value={latitude}
-              onChange={(event) => setLatitude(event.target.value)}
-              disabled={isSubmitting}
-              className="w-full rounded-lg border border-gray-700 bg-gray-900 text-white p-2"
-            />
-
-            <label className="block text-sm text-gray-300" htmlFor="dropoff-longitude">
-              Drop-off Longitude
-            </label>
-            <input
-              id="dropoff-longitude"
-              type="number"
-              step="any"
-              value={longitude}
-              onChange={(event) => setLongitude(event.target.value)}
-              disabled={isSubmitting}
-              className="w-full rounded-lg border border-gray-700 bg-gray-900 text-white p-2"
-            />
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-lg bg-cyan-600 text-white px-4 py-2 disabled:opacity-50"
+            {/* Return Form Card */}
+            <form
+              className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4 space-y-4"
+              onSubmit={handleEndTrip}
             >
-              {isSubmitting ? "Ending..." : "End Trip"}
-            </button>
-          </form>
+              <h3 className="text-lg font-semibold text-cyan-400">Return Vehicle</h3>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="dropoff-latitude">
+                    Drop-off Latitude
+                  </label>
+                  <input
+                    id="dropoff-latitude"
+                    type="number"
+                    step="any"
+                    value={latitude}
+                    onChange={(event) => setLatitude(event.target.value)}
+                    disabled={isSubmitting}
+                    placeholder="45.50"
+                    className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white placeholder:text-gray-500 outline-none disabled:opacity-50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="dropoff-longitude">
+                    Drop-off Longitude
+                  </label>
+                  <input
+                    id="dropoff-longitude"
+                    type="number"
+                    step="any"
+                    value={longitude}
+                    onChange={(event) => setLongitude(event.target.value)}
+                    disabled={isSubmitting}
+                    placeholder="-73.57"
+                    className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white placeholder:text-gray-500 outline-none disabled:opacity-50"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full rounded-lg bg-cyan-600 text-white px-4 py-2.5 font-semibold transition hover:bg-cyan-500 disabled:opacity-50"
+              >
+                {isSubmitting ? "Processing Return..." : "Return Vehicle"}
+              </button>
+            </form>
+
+            {/* Info Card */}
+            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
+              <h3 className="text-base font-semibold text-gray-300 mb-2">Valid Drop-off Zones</h3>
+              <p className="text-sm text-gray-400 mb-3">
+                You can return your vehicle in simulated valid drop-off zones near:
+              </p>
+              <ul className="space-y-1 text-sm text-gray-400 list-disc list-inside">
+                <li>Montreal Downtown (45.49°N - 45.53°N, 73.54°W - 73.59°W)</li>
+                <li>Verdun (45.44°N - 45.47°N, 73.55°W - 73.60°W)</li>
+                <li>Plateau (45.52°N - 45.55°N, 73.56°W - 73.61°W)</li>
+              </ul>
+            </article>
+          </section>
         )}
 
-        <p className="mt-4 text-gray-400">
-          Simulated valid drop-off zones are near Montreal Downtown, Verdun, and Plateau.
-        </p>
-
-        {message && <p className="mt-4 text-green-300">{message}</p>}
-        {error && <p className="mt-4 text-red-300">{error}</p>}
+        {message && (
+          <div className="mt-5 rounded-xl border border-green-500/70 bg-green-500/20 px-4 py-3 text-sm text-green-200">
+            {message}
+          </div>
+        )}
+        {error && (
+          <div className="mt-5 rounded-xl border border-red-500/70 bg-red-500/20 px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
       </main>
     </>
   );
