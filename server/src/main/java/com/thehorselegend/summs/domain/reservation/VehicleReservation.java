@@ -14,9 +14,10 @@ public class VehicleReservation extends Reservation {
                               LocalDateTime start,
                               LocalDateTime end,
                               String city,
+                              ReservationStatus status,
                               Location startLocation,
                               Location endLocation) {
-        super(reservationId, userId, reservableId, start, end, city, ReservationStatus.PENDING);
+        super(reservationId, userId, reservableId, start, end, city, status);
         this.startLocation = startLocation;
         this.endLocation = endLocation;
     }

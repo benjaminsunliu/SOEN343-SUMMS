@@ -73,7 +73,6 @@ class VehicleReservationServiceTest {
 
         // Create reservation
         reservation = new VehicleReservation(
-                1L,
                 userId,
                 vehicleId,
                 startTime,

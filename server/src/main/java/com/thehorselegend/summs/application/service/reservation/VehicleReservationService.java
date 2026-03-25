@@ -101,7 +101,7 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
         );
 
         validateAvailability(vehicle, startDate, endDate);
-
+        reservation.confirm();
         return (VehicleReservation) saveReservation(reservation);
     }
 

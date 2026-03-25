@@ -53,6 +53,7 @@ public class ReservationMapper {
                     entity.getStartDate(),
                     entity.getEndDate(),
                     entity.getCity(),
+                    entity.getStatus(),
                     new Location(entity.getStartLocation().getLatitude(), entity.getStartLocation().getLongitude()),
                     new Location(entity.getEndLocation().getLatitude(), entity.getEndLocation().getLongitude())
             );

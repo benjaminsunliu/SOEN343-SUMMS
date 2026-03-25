@@ -50,8 +50,6 @@ public class ReservationController {
                 request.getEndDate()
         );
 
-        reservation.confirm();
-
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
@@ -63,7 +61,7 @@ public class ReservationController {
     POST /api/vehicle-reservations/{reservationId}/cancel
     Cancels an existing vehicle reservation for the given reservation ID, ensuring it belongs to the current user.
     */
-    @PostMapping("/vehicle-reservations/{reservationId}/cancel")
+    @PostMapping("/reservation/{reservationId}/cancel")
     public ResponseEntity<VehicleReservationResponse> cancelVehicleReservation(
             @PathVariable Long reservationId,
             @SessionAttribute("user") UserEntity user
