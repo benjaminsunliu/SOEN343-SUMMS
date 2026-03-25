@@ -16,6 +16,7 @@ import com.thehorselegend.summs.infrastructure.persistence.TripRepository;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
+import com.thehorselegend.summs.shared.time.SummsTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,15 +59,17 @@ class RentalLifecycleServiceTest {
     private VehicleReservation confirmedReservation;
     private ReservationEntity confirmedReservationEntity;
     private VehicleEntity reservedVehicleEntity;
+    private LocalDateTime referenceNow;
 
     @BeforeEach
     void setUp() {
+        referenceNow = SummsTime.now();
         confirmedReservation = new VehicleReservation(
                 RESERVATION_ID,
                 CITIZEN_ID,
                 VEHICLE_ID,
-                LocalDateTime.now().minusMinutes(5),
-                LocalDateTime.now().plusMinutes(15),
+                referenceNow.minusMinutes(5),
+                referenceNow.plusMinutes(15),
                 "Montreal",
                 com.thehorselegend.summs.domain.reservation.ReservationStatus.CONFIRMED,
                 new Location(45.5017, -73.5673),
@@ -131,8 +134,8 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 CITIZEN_ID,
                 VEHICLE_ID,
-                LocalDateTime.now().minusHours(2),
-                LocalDateTime.now().minusMinutes(1),
+                referenceNow.minusHours(2),
+                referenceNow.minusMinutes(1),
                 "Montreal",
                 com.thehorselegend.summs.domain.reservation.ReservationStatus.CONFIRMED,
                 new Location(45.5017, -73.5673),
@@ -166,7 +169,7 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 VEHICLE_ID,
                 CITIZEN_ID,
-                LocalDateTime.now().minusMinutes(25),
+                referenceNow.minusMinutes(25),
                 null,
                 null
         );
@@ -174,8 +177,8 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 CITIZEN_ID,
                 VEHICLE_ID,
-                LocalDateTime.now().minusHours(1),
-                LocalDateTime.now().plusHours(1),
+                referenceNow.minusHours(1),
+                referenceNow.plusHours(1),
                 "Montreal",
                 com.thehorselegend.summs.domain.reservation.ReservationStatus.ACTIVE,
                 new Location(45.5017, -73.5673),
@@ -219,7 +222,7 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 VEHICLE_ID,
                 CITIZEN_ID,
-                LocalDateTime.now().minusMinutes(10),
+                referenceNow.minusMinutes(10),
                 null,
                 null
         );
@@ -227,8 +230,8 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 CITIZEN_ID,
                 VEHICLE_ID,
-                LocalDateTime.now().minusHours(1),
-                LocalDateTime.now().plusHours(1),
+                referenceNow.minusHours(1),
+                referenceNow.plusHours(1),
                 "Montreal",
                 com.thehorselegend.summs.domain.reservation.ReservationStatus.ACTIVE,
                 new Location(45.5017, -73.5673),
@@ -257,7 +260,7 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 VEHICLE_ID,
                 CITIZEN_ID,
-                LocalDateTime.now().minusMinutes(10),
+                referenceNow.minusMinutes(10),
                 null,
                 null
         );
@@ -265,8 +268,8 @@ class RentalLifecycleServiceTest {
                 RESERVATION_ID,
                 CITIZEN_ID,
                 VEHICLE_ID,
-                LocalDateTime.now().minusHours(1),
-                LocalDateTime.now().plusHours(1),
+                referenceNow.minusHours(1),
+                referenceNow.plusHours(1),
                 "Montreal",
                 com.thehorselegend.summs.domain.reservation.ReservationStatus.ACTIVE,
                 new Location(45.5017, -73.5673),

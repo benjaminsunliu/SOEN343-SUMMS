@@ -14,6 +14,7 @@ import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
+import com.thehorselegend.summs.shared.time.SummsTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -122,8 +123,8 @@ class VehicleReservationServiceTest {
                 99L,
                 userId,
                 vehicleId,
-                LocalDateTime.now().minusHours(2),
-                LocalDateTime.now().minusMinutes(5),
+                SummsTime.now().minusHours(2),
+                SummsTime.now().minusMinutes(5),
                 "CITY",
                 ReservationStatus.CONFIRMED,
                 start,
