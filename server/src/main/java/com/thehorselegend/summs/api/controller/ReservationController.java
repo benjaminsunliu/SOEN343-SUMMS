@@ -29,6 +29,7 @@ public class ReservationController {
     private static final String VEHICLE_NOT_FOUND_MESSAGE = "Vehicle not found";
     private static final String RESERVATION_NOT_FOUND_MESSAGE = "Reservation not found";
     private static final String CANCEL_NOT_AUTHORIZED_MESSAGE = "User not authorized to cancel this reservation";
+    private static final String ACCESS_NOT_AUTHORIZED_MESSAGE = "User not authorized to access this reservation";
     private static final String ALREADY_CANCELLED_MESSAGE = "Reservation is already cancelled";
     private static final String GEOCODING_UNAVAILABLE_MESSAGE = "Geocoding service is unavailable";
 
@@ -129,11 +130,7 @@ public class ReservationController {
             Authentication authentication
     ) {
         Long userId = resolveAuthenticatedUserId(authentication);
-        VehicleReservation reservation = fetchVehicleReservationById(reservationId);
-
-        if (!reservation.getUserId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have access to this reservation");
-        }
+        VehicleReservation reservation = fetchVehicleReservationById(reservationId, userId);
 
         return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation));
     }
@@ -193,14 +190,19 @@ public class ReservationController {
         }
     }
 
-    private VehicleReservation fetchVehicleReservationById(Long reservationId) {
+    private VehicleReservation fetchVehicleReservationById(Long reservationId, Long userId) {
         try {
-            return toVehicleReservation(reservationService.getReservationById(reservationId));
+            return toVehicleReservation(reservationService.getUserReservationById(reservationId, userId));
         } catch (IllegalArgumentException ex) {
             if (RESERVATION_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
             }
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        } catch (IllegalStateException ex) {
+            if (ACCESS_NOT_AUTHORIZED_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have access to this reservation");
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
         }
     }
 

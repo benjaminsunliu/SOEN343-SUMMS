@@ -2,6 +2,8 @@ package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
 import com.thehorselegend.summs.application.service.reservation.AddressGeocodingService;
+import com.thehorselegend.summs.domain.reservation.Reservation;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Car;
 import com.thehorselegend.summs.domain.vehicle.Location;
@@ -14,16 +16,19 @@ import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class VehicleReservationServiceTest {
@@ -100,5 +105,46 @@ class VehicleReservationServiceTest {
         assertEquals(vehicleId, created.getReservableId());
         assertNotNull(created.getStartLocation());
         assertNotNull(created.getEndLocation());
+    }
+
+    @Test
+    void getUserReservationsMarksPastConfirmedReservationAsExpired() {
+        Car reservedVehicle = new Car(
+                vehicleId,
+                VehicleStatus.RESERVED,
+                start,
+                100L,
+                0.5,
+                "ABC123",
+                4
+        );
+        VehicleReservation pastConfirmedReservation = new VehicleReservation(
+                99L,
+                userId,
+                vehicleId,
+                LocalDateTime.now().minusHours(2),
+                LocalDateTime.now().minusMinutes(5),
+                "CITY",
+                ReservationStatus.CONFIRMED,
+                start,
+                end
+        );
+
+        when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(VehicleMapper.toEntity(reservedVehicle)));
+        when(reservationRepository.findByUserId(userId))
+                .thenReturn(List.of(ReservationMapper.toEntity(pastConfirmedReservation)));
+        when(reservationRepository.save(any(ReservationEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(vehicleRepository.save(any(VehicleEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        List<Reservation> reservations = reservationService.getUserReservations(userId);
+
+        assertEquals(1, reservations.size());
+        assertEquals(ReservationStatus.EXPIRED, reservations.get(0).getStatus());
+
+        ArgumentCaptor<VehicleEntity> vehicleCaptor = ArgumentCaptor.forClass(VehicleEntity.class);
+        verify(vehicleRepository).save(vehicleCaptor.capture());
+        assertEquals(VehicleStatus.AVAILABLE, vehicleCaptor.getValue().getStatus());
     }
 }

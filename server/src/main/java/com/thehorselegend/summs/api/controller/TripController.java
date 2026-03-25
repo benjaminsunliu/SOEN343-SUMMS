@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/trips")
@@ -47,6 +48,26 @@ public class TripController {
     @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN')")
     public TripResponse getTripById(@PathVariable Long tripId) {
         return rentalLifecycleService.getTripById(tripId);
+    }
+
+    @GetMapping("/reservation/{reservationId}")
+    @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN')")
+    public TripResponse getTripByReservationId(
+            @PathVariable Long reservationId,
+            Authentication authentication) {
+        Long citizenId = resolveAuthenticatedUserId(authentication);
+        try {
+            return rentalLifecycleService.getTripByReservationId(citizenId, reservationId);
+        } catch (IllegalArgumentException ex) {
+            if (ex.getMessage() != null
+                    && ex.getMessage().startsWith("Trip not found for reservation id:")) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+            }
+            if ("Trip does not belong to the authenticated citizen.".equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
     }
 
     @GetMapping("/active/{citizenId}")

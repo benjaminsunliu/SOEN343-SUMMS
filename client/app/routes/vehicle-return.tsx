@@ -21,10 +21,20 @@ interface TripEndResponse {
   vehicleStatus: string;
 }
 
+interface ReservationDetailsResponse {
+  endLocation: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+interface TripDetailsResponse {
+  reservationId: number;
+}
+
 export default function VehicleReturnPage() {
   const [activeTrip, setActiveTripState] = useState<ActiveTrip | null>(null);
-  const [latitude, setLatitude] = useState("45.50");
-  const [longitude, setLongitude] = useState("-73.57");
+  const [reservationEndLocation, setReservationEndLocation] = useState<ReservationDetailsResponse["endLocation"] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,6 +42,68 @@ export default function VehicleReturnPage() {
   useEffect(() => {
     setActiveTripState(getActiveTrip());
   }, []);
+
+  useEffect(() => {
+    if (!activeTrip) {
+      setReservationEndLocation(null);
+      return;
+    }
+
+    const currentTrip = activeTrip;
+    let isMounted = true;
+
+    async function loadReservationEndLocation() {
+      const reservationId = await resolveReservationId(currentTrip);
+      const endLocation = await fetchReservationEndLocation(reservationId);
+
+      if (isMounted) {
+        setReservationEndLocation(endLocation);
+      }
+    }
+
+    void loadReservationEndLocation();
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTrip]);
+
+  async function resolveReservationId(trip: ActiveTrip): Promise<number | null> {
+    if (typeof trip.reservationId === "number") {
+      return trip.reservationId;
+    }
+
+    try {
+      const tripResponse = await apiFetch(`/api/trips/${trip.tripId}`);
+      if (!tripResponse.ok) {
+        return null;
+      }
+      const tripPayload = (await tripResponse.json()) as TripDetailsResponse;
+      return typeof tripPayload.reservationId === "number"
+        ? tripPayload.reservationId
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function fetchReservationEndLocation(
+    reservationId: number | null,
+  ): Promise<ReservationDetailsResponse["endLocation"] | null> {
+    if (reservationId === null) {
+      return null;
+    }
+
+    try {
+      const reservationResponse = await apiFetch(`/api/reservations/${reservationId}`);
+      if (!reservationResponse.ok) {
+        return null;
+      }
+      const reservation = (await reservationResponse.json()) as ReservationDetailsResponse;
+      return reservation.endLocation;
+    } catch {
+      return null;
+    }
+  }
 
   async function handleEndTrip(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,10 +114,8 @@ export default function VehicleReturnPage() {
       return;
     }
 
-    const parsedLatitude = Number(latitude);
-    const parsedLongitude = Number(longitude);
-    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)) {
-      setError("Please enter valid drop-off coordinates.");
+    if (!reservationEndLocation) {
+      setError("Unable to determine reservation destination for ending this trip.");
       setMessage(null);
       return;
     }
@@ -59,8 +129,8 @@ export default function VehicleReturnPage() {
         method: "POST",
         body: JSON.stringify({
           dropOffLocation: {
-            latitude: parsedLatitude,
-            longitude: parsedLongitude,
+            latitude: reservationEndLocation.latitude,
+            longitude: reservationEndLocation.longitude,
           },
         }),
       });
@@ -105,7 +175,6 @@ export default function VehicleReturnPage() {
 
         {activeTrip && (
           <section className="max-w-2xl space-y-5">
-            {/* Trip Info Card */}
             <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
               <h3 className="text-lg font-semibold text-cyan-400 mb-3">Active Trip Details</h3>
               <div className="grid grid-cols-2 gap-3 text-sm">
@@ -120,68 +189,19 @@ export default function VehicleReturnPage() {
               </div>
             </article>
 
-            {/* Return Form Card */}
             <form
               className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4 space-y-4"
               onSubmit={handleEndTrip}
             >
-              <h3 className="text-lg font-semibold text-cyan-400">Return Vehicle</h3>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="dropoff-latitude">
-                    Drop-off Latitude
-                  </label>
-                  <input
-                    id="dropoff-latitude"
-                    type="number"
-                    step="any"
-                    value={latitude}
-                    onChange={(event) => setLatitude(event.target.value)}
-                    disabled={isSubmitting}
-                    placeholder="45.50"
-                    className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white placeholder:text-gray-500 outline-none disabled:opacity-50"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="dropoff-longitude">
-                    Drop-off Longitude
-                  </label>
-                  <input
-                    id="dropoff-longitude"
-                    type="number"
-                    step="any"
-                    value={longitude}
-                    onChange={(event) => setLongitude(event.target.value)}
-                    disabled={isSubmitting}
-                    placeholder="-73.57"
-                    className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white placeholder:text-gray-500 outline-none disabled:opacity-50"
-                  />
-                </div>
-              </div>
-
+              <h3 className="text-lg font-semibold text-cyan-400">End Trip</h3>
               <button
                 type="submit"
                 disabled={isSubmitting}
                 className="w-full rounded-lg bg-cyan-600 text-white px-4 py-2.5 font-semibold transition hover:bg-cyan-500 disabled:opacity-50"
               >
-                {isSubmitting ? "Processing Return..." : "Return Vehicle"}
+                {isSubmitting ? "Ending Trip..." : "End Trip"}
               </button>
             </form>
-
-            {/* Info Card */}
-            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
-              <h3 className="text-base font-semibold text-gray-300 mb-2">Valid Drop-off Zones</h3>
-              <p className="text-sm text-gray-400 mb-3">
-                You can return your vehicle in simulated valid drop-off zones near:
-              </p>
-              <ul className="space-y-1 text-sm text-gray-400 list-disc list-inside">
-                <li>Montreal Downtown (45.49°N - 45.53°N, 73.54°W - 73.59°W)</li>
-                <li>Verdun (45.44°N - 45.47°N, 73.55°W - 73.60°W)</li>
-                <li>Plateau (45.52°N - 45.55°N, 73.56°W - 73.61°W)</li>
-              </ul>
-            </article>
           </section>
         )}
 

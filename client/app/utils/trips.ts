@@ -1,5 +1,6 @@
 export interface ActiveTrip {
   tripId: number;
+  reservationId?: number;
   vehicleId: number;
   citizenId: number;
   startTime: string;
@@ -107,7 +108,15 @@ export function getActiveTrip(): ActiveTrip | null {
       typeof parsed.citizenId === "number" &&
       typeof parsed.startTime === "string"
     ) {
-      return parsed as ActiveTrip;
+      return {
+        tripId: parsed.tripId,
+        reservationId: typeof parsed.reservationId === "number"
+          ? parsed.reservationId
+          : undefined,
+        vehicleId: parsed.vehicleId,
+        citizenId: parsed.citizenId,
+        startTime: parsed.startTime,
+      };
     }
   } catch {
     // Ignore malformed payload.

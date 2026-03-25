@@ -53,9 +53,19 @@ public abstract class Reservation {
         this.status = ReservationStatus.COMPLETED;
     }
 
+    public void expire() {
+        if (status != ReservationStatus.PENDING && status != ReservationStatus.CONFIRMED) {
+            throw new IllegalStateException("Only pending or confirmed reservations can be expired");
+        }
+        this.status = ReservationStatus.EXPIRED;
+    }
+
     public void cancel() {
         if (status == ReservationStatus.CANCELLED) {
             throw new IllegalStateException("Reservation is already cancelled");
+        }
+        if (status == ReservationStatus.EXPIRED) {
+            throw new IllegalStateException("Expired reservations cannot be cancelled");
         }
         if (status == ReservationStatus.ACTIVE) {
             throw new IllegalStateException("Active reservations cannot be cancelled");

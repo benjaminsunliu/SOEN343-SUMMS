@@ -32,7 +32,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -171,9 +170,22 @@ class RentalLifecycleServiceTest {
                 null,
                 null
         );
+        VehicleReservation activeReservation = new VehicleReservation(
+                RESERVATION_ID,
+                CITIZEN_ID,
+                VEHICLE_ID,
+                LocalDateTime.now().minusHours(1),
+                LocalDateTime.now().plusHours(1),
+                "Montreal",
+                com.thehorselegend.summs.domain.reservation.ReservationStatus.ACTIVE,
+                new Location(45.5017, -73.5673),
+                new Location(45.5017, -73.5673)
+        );
 
         when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(activeTripEntity));
         when(vehicleRepository.findById(VEHICLE_ID)).thenReturn(Optional.of(VehicleMapper.toEntity(inUseVehicle)));
+        when(reservationRepository.findById(RESERVATION_ID)).thenReturn(Optional.of(ReservationMapper.toEntity(activeReservation)));
+        when(reservationRepository.save(any(ReservationEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(tripRepository.save(any(TripEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(vehicleRepository.save(any(VehicleEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -188,9 +200,13 @@ class RentalLifecycleServiceTest {
         assertNotNull(response.endTime());
         assertTrue(response.totalDurationMinutes() >= 25L);
 
+        ArgumentCaptor<ReservationEntity> reservationCaptor = ArgumentCaptor.forClass(ReservationEntity.class);
         ArgumentCaptor<VehicleEntity> vehicleCaptor = ArgumentCaptor.forClass(VehicleEntity.class);
-        verify(reservationRepository, never()).save(any(ReservationEntity.class));
+        verify(reservationRepository).save(reservationCaptor.capture());
         verify(vehicleRepository).save(vehicleCaptor.capture());
+        assertEquals("COMPLETED", reservationCaptor.getValue().getStatus().name());
+        assertEquals(45.5050, reservationCaptor.getValue().getEndLocation().getLatitude());
+        assertEquals(-73.5700, reservationCaptor.getValue().getEndLocation().getLongitude());
         assertEquals(VehicleStatus.AVAILABLE, vehicleCaptor.getValue().getStatus());
         assertEquals(45.5050, vehicleCaptor.getValue().getLocation().getLatitude());
         assertEquals(-73.5700, vehicleCaptor.getValue().getLocation().getLongitude());
@@ -207,8 +223,20 @@ class RentalLifecycleServiceTest {
                 null,
                 null
         );
+        VehicleReservation activeReservation = new VehicleReservation(
+                RESERVATION_ID,
+                CITIZEN_ID,
+                VEHICLE_ID,
+                LocalDateTime.now().minusHours(1),
+                LocalDateTime.now().plusHours(1),
+                "Montreal",
+                com.thehorselegend.summs.domain.reservation.ReservationStatus.ACTIVE,
+                new Location(45.5017, -73.5673),
+                new Location(45.5017, -73.5673)
+        );
 
         when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(activeTripEntity));
+        when(reservationRepository.findById(RESERVATION_ID)).thenReturn(Optional.of(ReservationMapper.toEntity(activeReservation)));
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
@@ -219,6 +247,55 @@ class RentalLifecycleServiceTest {
                 )
         );
 
-        assertEquals("Trip cannot be ended outside a valid drop-off zone.", error.getMessage());
+        assertEquals("Trip cannot be ended outside a valid drop-off zone or your reserved destination.", error.getMessage());
+    }
+
+    @Test
+    void endTripAllowsDropOffAtReservedDestinationOutsideDefaultZones() {
+        TripEntity activeTripEntity = new TripEntity(
+                TRIP_ID,
+                RESERVATION_ID,
+                VEHICLE_ID,
+                CITIZEN_ID,
+                LocalDateTime.now().minusMinutes(10),
+                null,
+                null
+        );
+        VehicleReservation activeReservation = new VehicleReservation(
+                RESERVATION_ID,
+                CITIZEN_ID,
+                VEHICLE_ID,
+                LocalDateTime.now().minusHours(1),
+                LocalDateTime.now().plusHours(1),
+                "Montreal",
+                com.thehorselegend.summs.domain.reservation.ReservationStatus.ACTIVE,
+                new Location(45.5017, -73.5673),
+                new Location(46.0000, -74.0000)
+        );
+        Car inUseVehicle = new Car(
+                VEHICLE_ID,
+                VehicleStatus.IN_USE,
+                new Location(45.5017, -73.5673),
+                101L,
+                0.45,
+                "SUMMS-123",
+                4
+        );
+
+        when(tripRepository.findById(TRIP_ID)).thenReturn(Optional.of(activeTripEntity));
+        when(reservationRepository.findById(RESERVATION_ID)).thenReturn(Optional.of(ReservationMapper.toEntity(activeReservation)));
+        when(vehicleRepository.findById(VEHICLE_ID)).thenReturn(Optional.of(VehicleMapper.toEntity(inUseVehicle)));
+        when(reservationRepository.save(any(ReservationEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(tripRepository.save(any(TripEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(vehicleRepository.save(any(VehicleEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        TripResponse response = rentalLifecycleService.endTrip(
+                CITIZEN_ID,
+                TRIP_ID,
+                new EndTripRequest(new LocationDto(46.0000, -74.0000))
+        );
+
+        assertEquals(TRIP_ID, response.tripId());
+        assertEquals(VehicleStatus.AVAILABLE.name(), response.vehicleStatus());
     }
 }

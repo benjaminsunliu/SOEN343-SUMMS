@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { SiteNav } from "../root";
 import { apiFetch } from "../utils/api";
+import { buildDropOffOptions, type DropOffOption } from "../utils/drop-off-options";
 import { getAuthUser } from "../utils/auth";
 import { clearActiveTrip, setActiveTrip } from "../utils/trips";
 import ActiveTrip, { type ActiveTripViewModel } from "../components/active-trip-panel";
@@ -15,8 +16,17 @@ export function meta({}: Route.MetaArgs) {
 }
 
 interface TripApiResponse extends ActiveTripViewModel {
+  reservationId: number;
   endTime: string | null;
   totalDurationMinutes: number | null;
+}
+
+interface ReservationDetailsResponse {
+  city: string;
+  endLocation: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
 export default function ActiveTripPage() {
@@ -24,8 +34,10 @@ export default function ActiveTripPage() {
   const authUser = useMemo(() => getAuthUser(), []);
 
   const [trip, setTrip] = useState<ActiveTripViewModel | null>(null);
-  const [latitude, setLatitude] = useState("45.50");
-  const [longitude, setLongitude] = useState("-73.57");
+  const [dropOffOptions, setDropOffOptions] = useState<DropOffOption[]>(
+    buildDropOffOptions(null, null),
+  );
+  const [selectedDropOffKey, setSelectedDropOffKey] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,18 +69,31 @@ export default function ActiveTripPage() {
         setTrip(tripData);
         setActiveTrip({
           tripId: activeTrip.tripId,
+          reservationId: activeTrip.reservationId,
           vehicleId: activeTrip.vehicleId,
           citizenId: activeTrip.citizenId,
           startTime: activeTrip.startTime,
         });
+
+        const options = await buildDropOffOptionsForReservation(activeTrip.reservationId);
+        if (isMounted) {
+          setDropOffOptions(options);
+          setSelectedDropOffKey("");
+        }
       } catch {
         // No active trip
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
+    let isMounted = true;
     void loadActiveTrip();
+    return () => {
+      isMounted = false;
+    };
   }, [authUser]);
 
   async function handleEndTrip(event: React.FormEvent<HTMLFormElement>) {
@@ -79,10 +104,12 @@ export default function ActiveTripPage() {
       return;
     }
 
-    const parsedLatitude = Number(latitude);
-    const parsedLongitude = Number(longitude);
-    if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)) {
-      setError("Please enter valid drop-off coordinates.");
+    const selectedOption = findDropOffOptionByKey(
+      selectedDropOffKey,
+      dropOffOptions,
+    );
+    if (!selectedOption) {
+      setError("Please select a valid drop-off option from the dropdown.");
       return;
     }
 
@@ -95,8 +122,8 @@ export default function ActiveTripPage() {
         method: "POST",
         body: JSON.stringify({
           dropOffLocation: {
-            latitude: parsedLatitude,
-            longitude: parsedLongitude,
+            latitude: selectedOption.latitude,
+            longitude: selectedOption.longitude,
           },
         }),
       });
@@ -148,23 +175,23 @@ export default function ActiveTripPage() {
             <section className="mb-5 space-y-4">
               <ActiveTrip
                 trip={trip}
-                latitude={latitude}
-                longitude={longitude}
+                dropOffOptions={dropOffOptions}
+                selectedDropOffKey={selectedDropOffKey}
                 isEnding={isEnding}
-                onLatitudeChange={setLatitude}
-                onLongitudeChange={setLongitude}
+                onSelectedDropOffKeyChange={setSelectedDropOffKey}
                 onEndTrip={handleEndTrip}
               />
 
               <div className="rounded-xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
                 <h3 className="text-base font-semibold text-gray-300 mb-2">Valid Drop-off Zones</h3>
                 <p className="text-sm text-gray-400">
-                  You can end your trip in simulated valid drop-off zones near:
+                  End trips only using the dropdown options above.
                 </p>
                 <ul className="mt-2 text-sm text-gray-400 list-disc list-inside space-y-1">
-                  <li>Montreal Downtown (45.49°N - 45.53°N, 73.54°W - 73.59°W)</li>
-                  <li>Verdun (45.44°N - 45.47°N, 73.55°W - 73.60°W)</li>
-                  <li>Plateau (45.52°N - 45.55°N, 73.56°W - 73.61°W)</li>
+                  <li>Reserved destination from your reservation</li>
+                  <li>Montreal Downtown drop-off zone</li>
+                  <li>Verdun drop-off zone</li>
+                  <li>Plateau drop-off zone</li>
                 </ul>
               </div>
             </section>
@@ -184,4 +211,33 @@ export default function ActiveTripPage() {
       </main>
     </>
   );
+}
+
+async function buildDropOffOptionsForReservation(
+  reservationId: number,
+): Promise<DropOffOption[]> {
+  try {
+    const reservationResponse = await apiFetch(`/api/reservations/${reservationId}`);
+    if (!reservationResponse.ok) {
+      return buildDropOffOptions(null, null);
+    }
+
+    const reservation = (await reservationResponse.json()) as ReservationDetailsResponse;
+    return buildDropOffOptions(reservation.endLocation, reservation.city);
+  } catch {
+    return buildDropOffOptions(null, null);
+  }
+}
+
+function findDropOffOptionByKey(
+  key: string,
+  options: DropOffOption[],
+): DropOffOption | null {
+  if (key.trim().length === 0) {
+    return null;
+  }
+
+  return options.find(
+    (option) => option.key === key,
+  ) ?? null;
 }

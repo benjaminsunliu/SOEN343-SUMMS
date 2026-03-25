@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { DropOffOption } from "../utils/drop-off-options";
 
 export interface ActiveTripViewModel {
   tripId: number;
@@ -10,11 +11,10 @@ export interface ActiveTripViewModel {
 
 interface ActiveTripProps {
   trip: ActiveTripViewModel;
-  latitude: string;
-  longitude: string;
+  selectedDropOffKey: string;
+  dropOffOptions: DropOffOption[];
   isEnding: boolean;
-  onLatitudeChange: (value: string) => void;
-  onLongitudeChange: (value: string) => void;
+  onSelectedDropOffKeyChange: (value: string) => void;
   onEndTrip: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
@@ -28,11 +28,10 @@ function formatElapsed(totalSeconds: number): string {
 
 export default function ActiveTrip({
   trip,
-  latitude,
-  longitude,
+  selectedDropOffKey,
+  dropOffOptions,
   isEnding,
-  onLatitudeChange,
-  onLongitudeChange,
+  onSelectedDropOffKeyChange,
   onEndTrip,
 }: ActiveTripProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -86,38 +85,31 @@ export default function ActiveTrip({
       <form className="space-y-4 rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4" onSubmit={onEndTrip}>
         <h3 className="text-lg font-semibold text-cyan-400">End Trip</h3>
         
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="active-dropoff-latitude">
-              Drop-off Latitude
-            </label>
-            <input
-              id="active-dropoff-latitude"
-              type="number"
-              step="any"
-              value={latitude}
-              onChange={(event) => onLatitudeChange(event.target.value)}
-              disabled={isEnding}
-              placeholder="45.50"
-              className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white placeholder:text-gray-500 outline-none disabled:opacity-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="active-dropoff-longitude">
-              Drop-off Longitude
-            </label>
-            <input
-              id="active-dropoff-longitude"
-              type="number"
-              step="any"
-              value={longitude}
-              onChange={(event) => onLongitudeChange(event.target.value)}
-              disabled={isEnding}
-              placeholder="-73.57"
-              className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white placeholder:text-gray-500 outline-none disabled:opacity-50"
-            />
-          </div>
+        <div>
+          <label className="block text-sm uppercase tracking-widest text-gray-300 mb-2" htmlFor="active-dropoff-select">
+            Drop-off Location
+          </label>
+          <select
+            id="active-dropoff-select"
+            value={selectedDropOffKey}
+            onChange={(event) => onSelectedDropOffKeyChange(event.target.value)}
+            disabled={isEnding || dropOffOptions.length === 0}
+            className="w-full rounded-lg border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-white outline-none disabled:opacity-50"
+          >
+            <option value="">
+              {dropOffOptions.length === 0
+                ? "No drop-off options available"
+                : "Select a valid drop-off option"}
+            </option>
+            {dropOffOptions.map((option) => (
+              <option
+                key={option.key}
+                value={option.key}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         <button
