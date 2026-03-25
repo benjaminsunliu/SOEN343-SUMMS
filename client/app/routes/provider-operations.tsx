@@ -263,7 +263,7 @@ export default function ProviderOperationsPage() {
                                {vehicle.location.latitude.toFixed(2)}, {vehicle.location.longitude.toFixed(2)}
                             </td>
                             <td className="py-3 px-4 text-center text-gray-400"> 85%</td>
-                            <td className="py-3 px-4 text-gray-300 font-medium">${vehicle.costPerMinute.toFixed(2)}/hr CAD</td>
+                            <td className="py-3 px-4 text-gray-300 font-medium">${vehicle.costPerMinute.toFixed(2)}/min CAD</td>
                             <td className="py-3 px-4 text-center text-gray-400">{Math.floor(Math.random() * 300)}</td>
                           </tr>
                         );
@@ -339,4 +339,3 @@ function getVehicleIcon(type: string) {
       return "🚙";
   }
 }
-

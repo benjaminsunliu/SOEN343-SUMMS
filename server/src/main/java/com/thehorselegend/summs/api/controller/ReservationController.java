@@ -26,6 +26,7 @@ public class ReservationController {
     private static final String RESERVATION_NOT_FOUND_MESSAGE = "Reservation not found";
     private static final String CANCEL_NOT_AUTHORIZED_MESSAGE = "User not authorized to cancel this reservation";
     private static final String ALREADY_CANCELLED_MESSAGE = "Reservation is already cancelled";
+    private static final String GEOCODING_UNAVAILABLE_MESSAGE = "Geocoding service is unavailable";
 
     private final VehicleReservationService reservationService;
     private final UserRepository userRepository;
@@ -39,6 +40,8 @@ public class ReservationController {
     /**
      * Creates a vehicle reservation for the authenticated user.
      * Endpoint: POST /api/vehicles/{vehicleId}/reservations.
+     * Start location is fixed to the selected vehicle's current position.
+     * Backend geocodes the provided end address to coordinates.
      * Returns 201 Created with the reservation payload and Location header.
      */
     @PostMapping("/vehicles/{vehicleId}/reservations")
@@ -130,8 +133,7 @@ public class ReservationController {
                     userId,
                     vehicleId,
                     request.getCity(),
-                    request.getStartLocation(),
-                    request.getEndLocation(),
+                    request.getEndAddress(),
                     request.getStartDate(),
                     request.getEndDate()
             );
@@ -141,6 +143,9 @@ public class ReservationController {
             }
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
         } catch (IllegalStateException ex) {
+            if (GEOCODING_UNAVAILABLE_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage(), ex);
+            }
             throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
         }
     }

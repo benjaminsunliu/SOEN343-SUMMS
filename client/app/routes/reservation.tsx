@@ -1,10 +1,24 @@
-import { SiteNav } from "../root";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { SiteNav } from "../root";
+import { useLocation } from "react-router";
 import { apiFetch } from "../utils/api";
-import { getAuthUser } from "../utils/auth";
-import { setActiveTrip } from "../utils/trips";
+import {
+  mapVehiclesToCatalog,
+  type VehicleApiResponse,
+  type VehicleCatalogItem,
+} from "../utils/vehicle-catalog";
 import type { Route } from "./+types/reservation";
+
+interface ReservationState {
+  selectedVehicleId?: number;
+}
+
+interface AddressSuggestion {
+  address: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
+}
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -64,284 +78,569 @@ function formatDateTime(value: string): string {
 }
 
 export default function ReservationPage() {
-  const navigate = useNavigate();
-  const authUser = useMemo(() => getAuthUser(), []);
-  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
-  const [reservations, setReservations] = useState<ReservationResponse[]>([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isReserving, setIsReserving] = useState(false);
-  const [startingReservationId, setStartingReservationId] = useState<number | null>(null);
+  const location = useLocation();
+  const selectedState = (location.state as ReservationState | null) ?? {};
+  const [availableVehicles, setAvailableVehicles] = useState<VehicleCatalogItem[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(
+    selectedState.selectedVehicleId ?? null,
+  );
 
-  const canStartTrip = authUser?.role === "CITIZEN" || authUser?.role === "ADMIN";
+  const [city, setCity] = useState("");
+  const [startDate, setStartDate] = useState(toDateTimeInputValue(addHours(new Date(), 1)));
+  const [endDate, setEndDate] = useState(toDateTimeInputValue(addHours(new Date(), 2)));
+  const [startAddress, setStartAddress] = useState("");
+  const [endAddress, setEndAddress] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const [endAddressSuggestions, setEndAddressSuggestions] = useState<AddressSuggestion[]>([]);
 
-  const availableVehicles = vehicles.filter((vehicle) => vehicle.status === "AVAILABLE");
-  const reservableVehicleOptions = availableVehicles.sort((left, right) => left.id - right.id);
-  const startableReservations = reservations
-    .filter((reservation) => reservation.status === "CONFIRMED")
-    .sort((left, right) => Date.parse(left.endDate) - Date.parse(right.endDate));
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+
+  const selectedVehicle = useMemo(() => {
+    if (availableVehicles.length === 0) {
+      return null;
+    }
+
+    if (selectedVehicleId === null) {
+      return availableVehicles[0];
+    }
+
+    return availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
+  }, [availableVehicles, selectedVehicleId]);
 
   useEffect(() => {
-    async function loadReservationContext() {
-      if (!authUser || !canStartTrip) {
-        setIsLoading(false);
+    if (!selectedVehicle) {
+      setStartAddress("");
+      return;
+    }
+
+    if (city.trim().length === 0 && selectedVehicle.locationCity) {
+      setCity(selectedVehicle.locationCity);
+    }
+
+    setStartAddress(
+      selectedVehicle.station !== "Location unavailable"
+        ? selectedVehicle.station
+        : "Vehicle location unavailable",
+    );
+  }, [city, selectedVehicle]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvailableVehicles() {
+      try {
+        const response = await apiFetch("/api/vehicles/status/AVAILABLE");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch vehicles (${response.status})`);
+        }
+
+        const data = (await response.json()) as VehicleApiResponse[];
+        if (!isMounted) {
+          return;
+        }
+
+        const mappedVehicles = mapVehiclesToCatalog(data).filter((vehicle) => vehicle.available);
+        if (mappedVehicles.length === 0) {
+          setAvailableVehicles([]);
+          setVehicleError("No live available vehicles found.");
+          return;
+        }
+
+        setAvailableVehicles(mappedVehicles);
+        setVehicleError(null);
+      } catch {
+        if (isMounted) {
+          setAvailableVehicles([]);
+          setVehicleError("Unable to load live vehicles.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingVehicles(false);
+        }
+      }
+    }
+
+    void loadAvailableVehicles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const query = city.trim();
+    if (query.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await apiFetch(
+          `/api/locations/cities?query=${encodeURIComponent(query)}&limit=6`,
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch city suggestions (${response.status})`);
+        }
+
+        const suggestions = (await response.json()) as string[];
+        if (!isCancelled) {
+          setCitySuggestions(suggestions);
+        }
+      } catch {
+        if (!isCancelled) {
+          setCitySuggestions([]);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [city]);
+
+  useEffect(() => {
+    const query = endAddress.trim();
+    if (query.length < 3) {
+      setEndAddressSuggestions([]);
+      return;
+    }
+
+    const cityQuery = city.trim();
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const cityPart = cityQuery.length > 0
+          ? `&city=${encodeURIComponent(cityQuery)}`
+          : "";
+        const response = await apiFetch(
+          `/api/locations/suggestions?query=${encodeURIComponent(query)}${cityPart}&limit=6`,
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch address suggestions (${response.status})`);
+        }
+
+        const suggestions = (await response.json()) as AddressSuggestion[];
+        if (!isCancelled) {
+          setEndAddressSuggestions(suggestions);
+        }
+      } catch {
+        if (!isCancelled) {
+          setEndAddressSuggestions([]);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [city, endAddress]);
+
+  useEffect(() => {
+    if (city.trim().length > 0) {
+      return;
+    }
+
+    const matchingSuggestion = findExactAddressSuggestion(
+      endAddress,
+      endAddressSuggestions,
+    );
+    if (matchingSuggestion && matchingSuggestion.city.trim().length > 0) {
+      setCity(matchingSuggestion.city);
+    }
+  }, [city, endAddress, endAddressSuggestions]);
+
+  useEffect(() => {
+    if (availableVehicles.length === 0) {
+      setSelectedVehicleId(null);
+      return;
+    }
+
+    setSelectedVehicleId((previousId) => {
+      if (previousId !== null && availableVehicles.some((vehicle) => vehicle.id === previousId)) {
+        return previousId;
+      }
+
+      if (
+        typeof selectedState.selectedVehicleId === "number" &&
+        availableVehicles.some((vehicle) => vehicle.id === selectedState.selectedVehicleId)
+      ) {
+        return selectedState.selectedVehicleId;
+      }
+
+      return availableVehicles[0].id;
+    });
+  }, [availableVehicles, selectedState.selectedVehicleId]);
+
+  const selectedVehicleName = selectedVehicle?.name ?? "No vehicle selected";
+  const selectedVehicleProvider = selectedVehicle?.provider ?? "Unknown Provider";
+  const selectedVehicleCondition = selectedVehicle?.condition ?? "Unknown";
+
+  const selectedVehiclePricePerMinute = selectedVehicle?.pricePerMinute ?? 0;
+  const selectedVehiclePrice = `$${selectedVehiclePricePerMinute.toFixed(2)}`;
+
+  const durationMinutes = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const millis = end.getTime() - start.getTime();
+    if (!Number.isFinite(millis) || millis <= 0) {
+      return 0;
+    }
+    return millis / (1000 * 60);
+  }, [startDate, endDate]);
+
+  const estimatedTotal = selectedVehiclePricePerMinute * durationMinutes;
+
+  const routeStops = [
+    {
+      label: "From",
+      location: startAddress.trim().length > 0 ? startAddress : "--",
+      dateTime: startDate.trim().length > 0 ? formatDateForDisplay(startDate) : "--",
+    },
+    {
+      label: "To",
+      location: endAddress.trim().length > 0 ? endAddress : "--",
+      dateTime: endDate.trim().length > 0 ? formatDateForDisplay(endDate) : "--",
+    },
+  ];
+
+  const handleCreateReservation = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    if (selectedVehicleId === null) {
+      setSubmitError("Please select a vehicle first.");
+      return;
+    }
+
+    if (startDate.trim().length === 0 || endDate.trim().length === 0) {
+      setSubmitError("Start and end date/time are required.");
+      return;
+    }
+
+    if (city.trim().length === 0) {
+      setSubmitError("City is required.");
+      return;
+    }
+
+    if (endAddress.trim().length === 0) {
+      setSubmitError("End address is required.");
+      return;
+    }
+
+    const normalizedStart = normalizeDateTimeValue(startDate);
+    const normalizedEnd = normalizeDateTimeValue(endDate);
+
+    if (new Date(normalizedStart).getTime() >= new Date(normalizedEnd).getTime()) {
+      setSubmitError("Start date/time must be before end date/time.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await apiFetch(`/api/vehicles/${selectedVehicleId}/reservations`, {
+        method: "POST",
+        body: JSON.stringify({
+          endAddress: endAddress.trim(),
+          city: city.trim(),
+          startDate: normalizedStart,
+          endDate: normalizedEnd,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await readErrorMessage(
+          response,
+          "Could not create reservation.",
+        );
+        setSubmitError(message);
         return;
       }
 
-      try {
-        const [vehiclesResponse, reservationsResponse] = await Promise.all([
-          apiFetch("/api/vehicles"),
-          apiFetch("/api/reservations"),
-        ]);
-
-        const vehiclesPayload = (await vehiclesResponse.json()) as
-          | VehicleOption[]
-          | { message?: string };
-        const reservationsPayload = (await reservationsResponse.json()) as
-          | ReservationResponse[]
-          | { message?: string };
-
-        if (!vehiclesResponse.ok) {
-          throw new Error(
-            "message" in vehiclesPayload && vehiclesPayload.message
-              ? vehiclesPayload.message
-              : "Unable to load vehicles.",
-          );
-        }
-
-        if (!reservationsResponse.ok) {
-          throw new Error(
-            "message" in reservationsPayload && reservationsPayload.message
-              ? reservationsPayload.message
-              : "Unable to load reservations.",
-          );
-        }
-
-        setVehicles(vehiclesPayload as VehicleOption[]);
-        setReservations(reservationsPayload as ReservationResponse[]);
-      } catch (caught) {
-        setError(caught instanceof Error ? caught.message : "Unable to load reservations.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    void loadReservationContext();
-  }, [authUser, canStartTrip]);
-
-  async function handleReserveVehicle(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!authUser) {
-      setError("You must be logged in to reserve a vehicle.");
-      setMessage(null);
-      return;
-    }
-
-    const vehicleId = Number(selectedVehicleId);
-    const vehicle = vehicles.find((candidate) => candidate.id === vehicleId);
-
-    if (!vehicle) {
-      setError("Please choose an available vehicle.");
-      setMessage(null);
-      return;
-    }
-
-    setIsReserving(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const now = Date.now();
-      const response = await apiFetch(`/api/vehicles/${vehicleId}/reservations`, {
-        method: "POST",
-        body: JSON.stringify({
-          city: "Montreal",
-          startLocation: vehicle.location,
-          endLocation: vehicle.location,
-          startDate: new Date(now).toISOString(),
-          endDate: new Date(now + 15 * 60 * 1000).toISOString(),
-        }),
-      });
-
-      const payload = (await response.json()) as ReservationResponse | { message?: string };
-      if (!response.ok) {
-        const errorMessage = "message" in payload && payload.message
-          ? payload.message
-          : "Unable to reserve vehicle.";
-        throw new Error(errorMessage);
-      }
-
-      const reservation = payload as ReservationResponse;
-      setReservations((currentReservations) => [reservation, ...currentReservations]);
-      setVehicles((currentVehicles) => currentVehicles.map((candidate) => (
-        candidate.id === vehicle.id
-          ? { ...candidate, status: "RESERVED" }
-          : candidate
-      )));
-      setSelectedVehicleId("");
-      setMessage(
-        `Vehicle #${reservation.vehicleId} reserved until ${formatDateTime(reservation.endDate)}. You can start the trip now.`,
+      const createdReservation = (await response.json()) as { reservationId: number };
+      setSubmitSuccess(
+        `Reservation #${createdReservation.reservationId} was created successfully.`,
       );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Unable to reserve vehicle.");
+    } catch {
+      setSubmitError("Network error while creating reservation.");
     } finally {
-      setIsReserving(false);
+      setIsSubmitting(false);
     }
-  }
-
-  async function handleStartTrip(reservation: ReservationResponse) {
-    if (!authUser) {
-      setError("You must be logged in to start a trip.");
-      setMessage(null);
-      return;
-    }
-
-    setStartingReservationId(reservation.reservationId);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const response = await apiFetch("/api/trips/start", {
-        method: "POST",
-        body: JSON.stringify({
-          reservationId: reservation.reservationId,
-          paymentAuthorizationCode: `PAY-${Date.now()}`,
-        }),
-      });
-
-      const payload = (await response.json()) as TripStartResponse | { message?: string };
-      if (!response.ok) {
-        const errorMessage = "message" in payload && payload.message
-          ? payload.message
-          : "Unable to start trip.";
-        throw new Error(errorMessage);
-      }
-
-      const startedTrip = payload as TripStartResponse;
-      setActiveTrip({
-        tripId: startedTrip.tripId,
-        vehicleId: startedTrip.vehicleId,
-        citizenId: startedTrip.citizenId,
-        startTime: startedTrip.startTime,
-      });
-
-      setMessage(
-        `Trip #${startedTrip.tripId} started. Vehicle is now ${startedTrip.vehicleStatus}.`,
-      );
-      navigate("/trips/active");
-    } catch (caught) {
-      const messageToShow = caught instanceof Error ? caught.message : "Unable to start trip.";
-      setError(messageToShow);
-    } finally {
-      setStartingReservationId(null);
-    }
-  }
+  };
 
   return (
     <>
       <SiteNav />
-      <main className="ml-56 p-4 bg-gray-900 min-h-screen">
-        <h1 className="text-2xl font-semibold mb-2 text-white">Reservation</h1>
-
-        {!canStartTrip && (
-          <p className="text-red-300 mb-4">
-            Only citizen/admin accounts can reserve vehicles and start trips.
-          </p>
+      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+        <header className="mb-4 border-b border-[#253047] pb-3">
+          <h1 className="text-2xl font-bold tracking-tight text-cyan-400">Reservation</h1>
+        </header>
+        {vehicleError && (
+          <div className="mb-3 rounded-xl border border-amber-500/70 bg-amber-500/20 px-4 py-2 text-sm text-amber-200">
+            {vehicleError}
+          </div>
+        )}
+        {submitError && (
+          <div className="mb-3 rounded-xl border border-red-500/70 bg-red-500/20 px-4 py-2 text-sm text-red-200">
+            {submitError}
+          </div>
+        )}
+        {submitSuccess && (
+          <div className="mb-3 rounded-xl border border-green-500/70 bg-green-500/20 px-4 py-2 text-sm text-green-200">
+            {submitSuccess}
+          </div>
         )}
 
-        {isLoading && <p className="text-gray-400">Loading reservation options...</p>}
+        <section className="grid gap-5 xl:grid-cols-[1.05fr_1fr]">
+          <div className="space-y-5">
+            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b]">
+              <h2 className="border-b border-[#2a354a] px-5 py-3 text-xl font-semibold">Reservation Summary</h2>
 
-        {!isLoading && canStartTrip && (
-          <section className="space-y-6 max-w-4xl">
-            <form
-              className="space-y-4 bg-gray-950 border border-gray-800 rounded-xl p-4"
-              onSubmit={handleReserveVehicle}
-            >
-              <div>
-                <h2 className="text-lg font-semibold text-white">Reserve a vehicle</h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Choose an available vehicle. Reservations are held for 15 minutes so you can reach the vehicle and start your trip.
-                </p>
-              </div>
+              <div className="space-y-3 p-5">
+                <div className="rounded-xl bg-[#1a2a45] px-4 py-3.5">
+                  <p className="text-xl font-bold leading-tight">Selected: {selectedVehicleName}</p>
+                  <p className="text-base text-gray-300">
+                    {selectedVehicleProvider} - {selectedVehicleCondition} condition
+                  </p>
+                  <p className="text-right text-3xl font-bold leading-none text-cyan-400">{selectedVehiclePrice}/min</p>
+                </div>
 
-              <label className="block text-sm text-gray-300" htmlFor="vehicleId">
-                Available vehicles
-              </label>
-              <select
-                id="vehicleId"
-                value={selectedVehicleId}
-                onChange={(event) => setSelectedVehicleId(event.target.value)}
-                disabled={isReserving || reservableVehicleOptions.length === 0}
-                className="w-full rounded-lg border border-gray-700 bg-gray-900 text-white p-2"
-              >
-                <option value="">Select a vehicle</option>
-                {reservableVehicleOptions.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {`#${vehicle.id} · ${vehicle.type} · $${vehicle.costPerMinute.toFixed(2)}/min`}
-                  </option>
+                {routeStops.map((stop) => (
+                  <div key={stop.label} className="rounded-xl bg-[#1a2a45] px-4 py-3.5">
+                    <p className="text-xs uppercase tracking-[0.2em] text-gray-400">{stop.label}</p>
+                    <p className="text-xl font-medium leading-tight">{stop.location}</p>
+                    <p className="text-base text-gray-300">{stop.dateTime}</p>
+                  </div>
                 ))}
-              </select>
 
-              <button
-                type="submit"
-                disabled={isReserving || !selectedVehicleId}
-                className="rounded-lg bg-cyan-600 text-white px-4 py-2 disabled:opacity-50"
-              >
-                {isReserving ? "Reserving..." : "Reserve Vehicle"}
-              </button>
+                <div className="border-y border-[#2d3d57] py-3.5 text-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-200">Duration</span>
+                    <span className="font-semibold">{Math.round(durationMinutes)} min</span>
+                  </div>
+                </div>
 
-              {reservableVehicleOptions.length === 0 && (
-                <p className="text-sm text-gray-500">
-                  No vehicles are currently available to reserve.
-                </p>
-              )}
-            </form>
-
-            <section className="space-y-3 bg-gray-950 border border-gray-800 rounded-xl p-4">
-              <div>
-                <h2 className="text-lg font-semibold text-white">Reserved vehicles</h2>
-                <p className="text-sm text-gray-400 mt-1">
-                  Confirmed reservations stay here until they expire or you start the trip.
-                </p>
+                <div className="flex items-end justify-between text-2xl">
+                  <p className="font-semibold">Estimated Total</p>
+                  <p className="font-bold text-cyan-400">${estimatedTotal.toFixed(2)}</p>
+                </div>
               </div>
+            </article>
 
-              {startableReservations.length === 0 && (
-                <p className="text-sm text-gray-500">No confirmed reservations are ready to start.</p>
-              )}
+          </div>
 
-              {startableReservations.map((reservation) => (
-                <article
-                  key={reservation.reservationId}
-                  className="rounded-xl border border-gray-800 bg-gray-900/70 p-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
-                >
-                  <div className="space-y-1 text-sm">
-                    <p className="text-white font-medium">Vehicle #{reservation.vehicleId}</p>
-                    <p className="text-gray-400">Reservation #{reservation.reservationId}</p>
-                    <p className="text-gray-400">Status: <span className="text-amber-300 font-medium">RESERVED</span></p>
-                    <p className="text-gray-400">City: <span className="text-white">{reservation.city}</span></p>
-                    <p className="text-gray-400">Valid until: <span className="text-white">{formatDateTime(reservation.endDate)}</span></p>
+          <div className="space-y-5">
+            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
+              <h2 className="mb-4 text-2xl font-semibold">Create Reservation</h2>
+
+              <form className="space-y-4" onSubmit={(event) => void handleCreateReservation(event)}>
+                <div>
+                  <label htmlFor="vehicle" className="mb-1.5 block text-sm uppercase text-gray-300">
+                    Vehicle
+                  </label>
+                  <select
+                    id="vehicle"
+                    value={selectedVehicleId ?? ""}
+                    onChange={(event) => {
+                      const parsedVehicleId = Number(event.target.value);
+                      setSelectedVehicleId(Number.isFinite(parsedVehicleId) ? parsedVehicleId : null);
+                    }}
+                    className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                    disabled={isLoadingVehicles}
+                  >
+                    {availableVehicles.length === 0 ? (
+                      <option value="">No vehicles available</option>
+                    ) : (
+                      availableVehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.name} ({vehicle.priceLabel})
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="city" className="mb-1.5 block text-sm uppercase text-gray-300">
+                    City
+                  </label>
+                  <input
+                    id="city"
+                    type="text"
+                    list="city-suggestion-list"
+                    value={city}
+                    onChange={(event) => setCity(event.target.value)}
+                    className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none placeholder:text-gray-500"
+                  />
+                  <datalist id="city-suggestion-list">
+                    {citySuggestions.map((suggestedCity) => (
+                      <option key={suggestedCity} value={suggestedCity} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="start-date" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      Start Date/Time
+                    </label>
+                    <input
+                      id="start-date"
+                      type="datetime-local"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
+                      className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                    />
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => void handleStartTrip(reservation)}
-                    disabled={startingReservationId === reservation.reservationId}
-                    className="rounded-lg bg-emerald-600 text-white px-4 py-2 disabled:opacity-50"
-                  >
-                    {startingReservationId === reservation.reservationId ? "Starting..." : "Start Trip"}
-                  </button>
-                </article>
-              ))}
-            </section>
-          </section>
-        )}
+                  <div>
+                    <label htmlFor="end-date" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Date/Time
+                    </label>
+                    <input
+                      id="end-date"
+                      type="datetime-local"
+                      value={endDate}
+                      onChange={(event) => setEndDate(event.target.value)}
+                      className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                    />
+                  </div>
+                </div>
 
-        {message && <p className="mt-4 text-green-300">{message}</p>}
-        {error && <p className="mt-4 text-red-300">{error}</p>}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="start-address" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      Start Address
+                    </label>
+                    <input
+                      id="start-address"
+                      type="text"
+                      value={startAddress}
+                      readOnly
+                      className="w-full cursor-not-allowed rounded-xl border border-[#50617c] bg-[#0f1c33] px-3 py-2.5 text-base text-gray-200 outline-none"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Fixed to selected vehicle location.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="end-address" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Address
+                    </label>
+                    <input
+                      id="end-address"
+                      type="text"
+                      list="end-address-suggestion-list"
+                      value={endAddress}
+                      onChange={(event) => setEndAddress(event.target.value)}
+                      placeholder="e.g. 800 Rue du Square-Victoria"
+                      className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                    />
+                    <datalist id="end-address-suggestion-list">
+                      {endAddressSuggestions.map((suggestion) => (
+                        <option
+                          key={`${suggestion.address}-${suggestion.latitude}-${suggestion.longitude}`}
+                          value={suggestion.address}
+                          label={suggestion.city}
+                        />
+                      ))}
+                    </datalist>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting || selectedVehicleId === null}
+                  className="w-full rounded-xl bg-cyan-400 px-5 py-2.5 text-xl font-semibold text-slate-950 transition hover:bg-cyan-300"
+                >
+                  {isSubmitting ? "Creating Reservation..." : `Reserve for ${selectedVehiclePrice}/min`}
+                </button>
+              </form>
+            </article>
+
+            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b]">
+              <h3 className="border-b border-[#2a354a] px-5 py-3 text-2xl font-semibold">Cancellation Policy</h3>
+              <p className="px-5 py-3 text-base leading-snug text-gray-200">
+                Cancel up to <span className="font-semibold">1 hour before</span> start time for a full refund.
+                Cancellations within 1 hour may incur a $2.00 fee. No-shows are charged the full amount.
+              </p>
+            </article>
+          </div>
+        </section>
       </main>
     </>
   );
+}
+
+function findExactAddressSuggestion(
+  value: string,
+  suggestions: AddressSuggestion[],
+): AddressSuggestion | null {
+  const normalizedValue = value.trim().toLowerCase();
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  return (
+    suggestions.find(
+      (suggestion) => suggestion.address.trim().toLowerCase() === normalizedValue,
+    ) ?? null
+  );
+}
+
+function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function toDateTimeInputValue(date: Date): string {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function normalizeDateTimeValue(value: string): string {
+  return value.length === 16 ? `${value}:00` : value;
+}
+
+function formatDateForDisplay(value: string): string {
+  const parsedDate = new Date(value);
+  if (!Number.isFinite(parsedDate.getTime())) {
+    return value;
+  }
+
+  return parsedDate.toLocaleString();
+}
+
+async function readErrorMessage(
+  response: Response,
+  fallbackMessage: string,
+): Promise<string> {
+  try {
+    const data = (await response.json()) as {
+      message?: string;
+      error?: string;
+    };
+
+    if (typeof data.message === "string" && data.message.trim().length > 0) {
+      return data.message;
+    }
+    if (typeof data.error === "string" && data.error.trim().length > 0) {
+      return data.error;
+    }
+  } catch {
+    // Ignore parse errors and use fallback.
+  }
+
+  return `${fallbackMessage} (${response.status})`;
 }

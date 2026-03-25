@@ -1,6 +1,7 @@
 package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.api.dto.*;
+import com.thehorselegend.summs.application.service.reservation.AddressGeocodingService;
 import com.thehorselegend.summs.domain.vehicle.*;
 import com.thehorselegend.summs.infrastructure.persistence.*;
 import org.springframework.stereotype.Service;
@@ -31,16 +32,19 @@ public class VehicleService {
     private final BicycleRepository bicycleRepository;
     private final ScooterRepository scooterRepository;
     private final CarRepository carRepository;
+    private final AddressGeocodingService geocodingService;
 
     public VehicleService(
             VehicleRepository vehicleRepository,
             BicycleRepository bicycleRepository,
             ScooterRepository scooterRepository,
-            CarRepository carRepository) {
+            CarRepository carRepository,
+            AddressGeocodingService geocodingService) {
         this.vehicleRepository = vehicleRepository;
         this.bicycleRepository = bicycleRepository;
         this.scooterRepository = scooterRepository;
         this.carRepository = carRepository;
+        this.geocodingService = geocodingService;
     }
 
     /**
@@ -52,7 +56,7 @@ public class VehicleService {
      */
     public VehicleResponse createBicycle(CreateBicycleRequest request) {
         validateProviderId(request.providerId());
-        Location location = dtoToLocation(request.location());
+        Location location = resolveLocation(request.location(), request.address(), request.city());
 
         Bicycle bicycle = VehicleFactory.createBicycle(location, request.providerId(), request.costPerMinute());
         VehicleEntity savedEntity = vehicleRepository.save(VehicleMapper.toEntity(bicycle));
@@ -70,7 +74,7 @@ public class VehicleService {
      */
     public VehicleResponse createScooter(CreateScooterRequest request) {
         validateProviderId(request.providerId());
-        Location location = dtoToLocation(request.location());
+        Location location = resolveLocation(request.location(), request.address(), request.city());
 
         Scooter scooter = VehicleFactory.createScooter(location, request.providerId(), request.costPerMinute(), request.maxRange());
         VehicleEntity savedEntity = vehicleRepository.save(VehicleMapper.toEntity(scooter));
@@ -88,7 +92,7 @@ public class VehicleService {
      */
     public VehicleResponse createCar(CreateCarRequest request) {
         validateProviderId(request.providerId());
-        Location location = dtoToLocation(request.location());
+        Location location = resolveLocation(request.location(), request.address(), request.city());
 
         Car car = VehicleFactory.createCar(location, request.providerId(), request.costPerMinute(), 
                 request.licensePlate(), request.seatingCapacity());
@@ -206,6 +210,21 @@ public class VehicleService {
     // Note: Handles all vehicle subtypes (Bicycle, Scooter, Car).
     private VehicleResponse vehicleToResponse(Vehicle vehicle) {
         LocationDto locationDto = locationToDto(vehicle.getLocation());
+        String locationAddress = null;
+        String locationCity = null;
+
+        try {
+            AddressSuggestionDto reverseLocation = geocodingService.reverseGeocode(
+                    vehicle.getLocation().latitude(),
+                    vehicle.getLocation().longitude()
+            );
+            locationAddress = reverseLocation.address();
+            locationCity = reverseLocation.city();
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            // Do not fail vehicle endpoints when reverse geocoding cannot resolve.
+            locationAddress = null;
+            locationCity = null;
+        }
         
         Double maxRange = null;
         String licensePlate = null;
@@ -231,6 +250,8 @@ public class VehicleService {
                 type,
                 vehicle.getStatus().name(),
                 locationDto,
+                locationAddress,
+                locationCity,
                 vehicle.getProviderId(),
                 vehicle.getCostPerMinute(),
                 maxRange,
@@ -244,6 +265,29 @@ public class VehicleService {
         return new Location(dto.latitude(), dto.longitude());
     }
 
+    private Location resolveLocation(LocationDto locationDto, String address, String city) {
+        if (locationDto != null) {
+            return dtoToLocation(locationDto);
+        }
+
+        String normalizedAddress = normalizeText(address);
+        String normalizedCity = normalizeText(city);
+
+        if (normalizedAddress == null && normalizedCity == null) {
+            throw new IllegalArgumentException(
+                    "Either coordinates (location) or address and city are required"
+            );
+        }
+        if (normalizedAddress == null) {
+            throw new IllegalArgumentException("Address is required when location is not provided");
+        }
+        if (normalizedCity == null) {
+            throw new IllegalArgumentException("City is required when location is not provided");
+        }
+
+        return geocodingService.geocode(normalizedAddress, normalizedCity);
+    }
+
      // Converts a domain Location record to a LocationDto.
     private LocationDto locationToDto(Location location) {
         return new LocationDto(location.latitude(), location.longitude());
@@ -255,5 +299,13 @@ public class VehicleService {
         if (providerId == null) {
             throw new IllegalArgumentException("Provider ID cannot be null");
         }
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 }

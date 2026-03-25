@@ -7,8 +7,11 @@ import jakarta.validation.constraints.Positive;
 
 public record CreateCarRequest(
         @Valid
-        @NotNull(message = "Location is required")
         LocationDto location,
+
+        String address,
+
+        String city,
 
         @NotNull(message = "Provider ID is required")
         Long providerId,
