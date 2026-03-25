@@ -2,7 +2,6 @@ package com.thehorselegend.summs.api.dto;
 
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Location;
-import com.thehorselegend.summs.domain.vehicle.Vehicle;
 
 public class VehicleReservationResponse {
 
@@ -28,8 +27,7 @@ public class VehicleReservationResponse {
         this.endLocation = endLocation;
     }
 
-    // Factory method from domain
-    public static VehicleReservationResponse fromDomain(VehicleReservation reservation, Vehicle vehicle) {
+    public static VehicleReservationResponse fromDomain(VehicleReservation reservation) {
         return new VehicleReservationResponse(
                 reservation.getId(),
                 reservation.getUserId(),

@@ -31,7 +31,6 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
 
     @Override
     protected void validateAvailability(Vehicle vehicle, LocalDateTime start, LocalDateTime end) {
-        System.out.println("Vehicle status: " + vehicle.getStatus());
         if (!vehicle.isAvailable()) {
             throw new IllegalStateException("Vehicle is not available for reservation");
         }

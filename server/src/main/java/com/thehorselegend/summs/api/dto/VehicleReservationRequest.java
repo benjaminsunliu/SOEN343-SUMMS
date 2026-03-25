@@ -1,13 +1,28 @@
 package com.thehorselegend.summs.api.dto;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 import java.time.LocalDateTime;
 
 public class VehicleReservationRequest {
 
+    @Valid
+    @NotNull(message = "Start location is required")
     private LocationDto startLocation;
+
+    @Valid
+    @NotNull(message = "End location is required")
     private LocationDto endLocation;
+
+    @NotBlank(message = "City is required")
     private String city;
+
+    @NotNull(message = "Start date is required")
     private LocalDateTime startDate;
+
+    @NotNull(message = "End date is required")
     private LocalDateTime endDate;
 
     public VehicleReservationRequest() {}

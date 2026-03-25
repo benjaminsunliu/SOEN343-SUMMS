@@ -5,135 +5,180 @@ import com.thehorselegend.summs.api.dto.VehicleReservationResponse;
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
 import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
-import com.thehorselegend.summs.domain.vehicle.Location;
-import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
-import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
-import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
+import com.thehorselegend.summs.infrastructure.persistence.UserRepository;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api")
 public class ReservationController {
 
+    private static final String VEHICLE_NOT_FOUND_MESSAGE = "Vehicle not found";
+    private static final String RESERVATION_NOT_FOUND_MESSAGE = "Reservation not found";
+    private static final String CANCEL_NOT_AUTHORIZED_MESSAGE = "User not authorized to cancel this reservation";
+    private static final String ALREADY_CANCELLED_MESSAGE = "Reservation is already cancelled";
+
     private final VehicleReservationService reservationService;
-    private final VehicleRepository vehicleRepository;
+    private final UserRepository userRepository;
 
     public ReservationController(VehicleReservationService reservationService,
-                                 VehicleRepository vehicleRepository) {
+                                 UserRepository userRepository) {
         this.reservationService = reservationService;
-        this.vehicleRepository = vehicleRepository;
+        this.userRepository = userRepository;
     }
 
-    /*
-    POST /api/vehicles/{vehicleId}/reserve
-    Creates a new vehicle reservation for the given vehicle ID using the provided request data (locations, dates, city) for the currently logged-in user.
-    */
-    @PostMapping("/vehicles/{vehicleId}/reserve")
-    public ResponseEntity<VehicleReservationResponse> reserveVehicle(
+    /**
+     * Creates a vehicle reservation for the authenticated user.
+     * Endpoint: POST /api/vehicles/{vehicleId}/reservations.
+     * Returns 201 Created with the reservation payload and Location header.
+     */
+    @PostMapping("/vehicles/{vehicleId}/reservations")
+    public ResponseEntity<VehicleReservationResponse> createVehicleReservation(
             @PathVariable Long vehicleId,
-            @RequestBody VehicleReservationRequest request,
-            @SessionAttribute("user") UserEntity user
+            @Valid @RequestBody VehicleReservationRequest request,
+            Authentication authentication,
+            UriComponentsBuilder uriBuilder
     ) {
-        // Pass start/end LocationDto from request
-        VehicleReservation reservation = (VehicleReservation) reservationService.reserveVehicle(
-                user.getId(),
-                vehicleId,
-                request.getCity(),
-                request.getStartLocation(),
-                request.getEndLocation(),
-                request.getStartDate(),
-                request.getEndDate()
-        );
+        Long userId = resolveAuthenticatedUserId(authentication);
+        VehicleReservation reservation = reserveVehicle(userId, vehicleId, request);
 
-        Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                .map(VehicleMapper::toDomain)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
+        URI location = uriBuilder.path("/api/reservations/{reservationId}")
+                .buildAndExpand(reservation.getId())
+                .toUri();
 
-        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation, vehicle));
+        return ResponseEntity.created(location).body(VehicleReservationResponse.fromDomain(reservation));
     }
 
-    /*
-    POST /api/vehicle-reservations/{reservationId}/cancel
-    Cancels an existing vehicle reservation for the given reservation ID, ensuring it belongs to the current user.
-    */
-    @PostMapping("/reservation/{reservationId}/cancel")
-    public ResponseEntity<VehicleReservationResponse> cancelVehicleReservation(
+    /**
+     * Cancels an existing reservation owned by the authenticated user.
+     * Endpoint: DELETE /api/reservations/{reservationId}.
+     * Returns 204 No Content when cancellation succeeds.
+     */
+    @DeleteMapping("/reservations/{reservationId}")
+    public ResponseEntity<Void> cancelVehicleReservation(
             @PathVariable Long reservationId,
-            @SessionAttribute("user") UserEntity user
+            Authentication authentication
     ) {
-        // Cancel the reservation using the service
-        reservationService.cancelReservation(reservationId, user.getId());
-
-        Reservation reservation = reservationService.getReservationById(reservationId);
-        if (!(reservation instanceof VehicleReservation vehicleReservation)) {
-            throw new IllegalArgumentException("Reservation is not a vehicle reservation");
-        }
-
-        Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
-                .map(VehicleMapper::toDomain)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
-
-        // Return DTO
-        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(vehicleReservation, vehicle));
+        Long userId = resolveAuthenticatedUserId(authentication);
+        cancelReservation(reservationId, userId);
+        return ResponseEntity.noContent().build();
     }
 
-    /*
-    GET /api/users/me/vehicle-reservations
-    Retrieves all vehicle reservations associated with the currently logged-in user.
-    */
-    @GetMapping("/users/me/vehicle-reservations")
-    public ResponseEntity<List<VehicleReservationResponse>> getUserVehicleReservations(
-            @SessionAttribute("user") UserEntity user
+    /**
+     * Lists all vehicle reservations for the authenticated user.
+     * Endpoint: GET /api/reservations.
+     * Returns 200 OK with a reservation list.
+     */
+    @GetMapping("/reservations")
+    public ResponseEntity<List<VehicleReservationResponse>> getCurrentUserReservations(
+            Authentication authentication
     ) {
-        // Fetch all reservations of the user
-        List<Reservation> reservations = reservationService.getUserReservations(user.getId());
-
-        // Filter only vehicle reservations
-        List<VehicleReservationResponse> response = reservations.stream()
-                .filter(reservation -> reservation instanceof VehicleReservation)
-                .map(reservation -> {
-                    VehicleReservation vehicleReservation = (VehicleReservation) reservation;
-
-                    // Fetch vehicle info
-                    Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
-                            .map(VehicleMapper::toDomain)
-                            .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
-
-                    // Convert to DTO
-                    return VehicleReservationResponse.fromDomain(vehicleReservation, vehicle);
-                })
-                .collect(Collectors.toList());
+        Long userId = resolveAuthenticatedUserId(authentication);
+        List<VehicleReservationResponse> response = reservationService.getUserReservations(userId).stream()
+                .map(this::toVehicleReservation)
+                .map(VehicleReservationResponse::fromDomain)
+                .toList();
 
         return ResponseEntity.ok(response);
     }
 
-    /*
-    GET /api/vehicle-reservations/{reservationId}
-    Retrieves a specific vehicle reservation by its ID, including associated vehicle details.
-    */
-    @GetMapping("/vehicle-reservations/{reservationId}")
+    /**
+     * Fetches one reservation by id for the authenticated user.
+     * Endpoint: GET /api/reservations/{reservationId}.
+     * Returns 200 OK if found and owned by the caller.
+     */
+    @GetMapping("/reservations/{reservationId}")
     public ResponseEntity<VehicleReservationResponse> getVehicleReservationById(
-            @PathVariable Long reservationId
+            @PathVariable Long reservationId,
+            Authentication authentication
     ) {
-        // Fetch reservation from service
-        Reservation reservation = reservationService.getReservationById(reservationId);
+        Long userId = resolveAuthenticatedUserId(authentication);
+        VehicleReservation reservation = fetchVehicleReservationById(reservationId);
 
-        // Ensure it’s a VehicleReservation
-        if (!(reservation instanceof VehicleReservation vehicleReservation)) {
-            throw new IllegalArgumentException("Reservation is not a vehicle reservation");
+        if (!reservation.getUserId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have access to this reservation");
         }
 
-        // Fetch the associated vehicle
-        Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
-                .map(VehicleMapper::toDomain)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
+        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation));
+    }
 
-        // Map to DTO
-        return ResponseEntity.ok(VehicleReservationResponse.fromDomain(vehicleReservation, vehicle));
+    private Long resolveAuthenticatedUserId(Authentication authentication) {
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
+        }
+
+        String email = authentication.getName();
+        UserEntity user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED,
+                        "Authenticated user no longer exists"));
+
+        return user.getId();
+    }
+
+    private VehicleReservation reserveVehicle(Long userId, Long vehicleId, VehicleReservationRequest request) {
+        try {
+            return (VehicleReservation) reservationService.reserveVehicle(
+                    userId,
+                    vehicleId,
+                    request.getCity(),
+                    request.getStartLocation(),
+                    request.getEndLocation(),
+                    request.getStartDate(),
+                    request.getEndDate()
+            );
+        } catch (IllegalArgumentException ex) {
+            if (VEHICLE_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        } catch (IllegalStateException ex) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
+        }
+    }
+
+    private void cancelReservation(Long reservationId, Long userId) {
+        try {
+            reservationService.cancelReservation(reservationId, userId);
+        } catch (IllegalArgumentException ex) {
+            if (RESERVATION_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        } catch (IllegalStateException ex) {
+            if (CANCEL_NOT_AUTHORIZED_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, ex.getMessage(), ex);
+            }
+            if (ALREADY_CANCELLED_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
+        }
+    }
+
+    private VehicleReservation fetchVehicleReservationById(Long reservationId) {
+        try {
+            return toVehicleReservation(reservationService.getReservationById(reservationId));
+        } catch (IllegalArgumentException ex) {
+            if (RESERVATION_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        }
+    }
+
+    private VehicleReservation toVehicleReservation(Reservation reservation) {
+        if (reservation instanceof VehicleReservation vehicleReservation) {
+            return vehicleReservation;
+        }
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle reservation not found");
     }
 }
