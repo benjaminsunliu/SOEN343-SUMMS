@@ -1,12 +1,23 @@
+import { useEffect, useMemo, useState } from "react";
 import { SiteNav } from "../root";
 import { useLocation } from "react-router";
+import { apiFetch } from "../utils/api";
+import {
+  mapVehiclesToCatalog,
+  type VehicleApiResponse,
+  type VehicleCatalogItem,
+} from "../utils/vehicle-catalog";
 import type { Route } from "./+types/reservation";
 
 interface ReservationState {
-  selectedVehicleName?: string;
-  selectedVehicleProvider?: string;
-  selectedVehicleCondition?: string;
-  selectedVehiclePrice?: string;
+  selectedVehicleId?: number;
+}
+
+interface AddressSuggestion {
+  address: string;
+  city: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -19,23 +30,304 @@ export function meta({}: Route.MetaArgs) {
 export default function ReservationPage() {
   const location = useLocation();
   const selectedState = (location.state as ReservationState | null) ?? {};
-  const selectedVehicleName = selectedState.selectedVehicleName ?? "City Bike #B-41";
-  const selectedVehicleProvider = selectedState.selectedVehicleProvider ?? "BIXI Montreal";
-  const selectedVehicleCondition = selectedState.selectedVehicleCondition ?? "Excellent";
-  const selectedVehiclePrice = selectedState.selectedVehiclePrice ?? "$3.50";
+  const [availableVehicles, setAvailableVehicles] = useState<VehicleCatalogItem[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(
+    selectedState.selectedVehicleId ?? null,
+  );
+
+  const [city, setCity] = useState("");
+  const [startDate, setStartDate] = useState(toDateTimeInputValue(addHours(new Date(), 1)));
+  const [endDate, setEndDate] = useState(toDateTimeInputValue(addHours(new Date(), 2)));
+  const [startAddress, setStartAddress] = useState("");
+  const [endAddress, setEndAddress] = useState("");
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
+  const [endAddressSuggestions, setEndAddressSuggestions] = useState<AddressSuggestion[]>([]);
+
+  const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [vehicleError, setVehicleError] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
+
+  const selectedVehicle = useMemo(() => {
+    if (availableVehicles.length === 0) {
+      return null;
+    }
+
+    if (selectedVehicleId === null) {
+      return availableVehicles[0];
+    }
+
+    return availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
+  }, [availableVehicles, selectedVehicleId]);
+
+  useEffect(() => {
+    if (!selectedVehicle) {
+      setStartAddress("");
+      return;
+    }
+
+    if (city.trim().length === 0 && selectedVehicle.locationCity) {
+      setCity(selectedVehicle.locationCity);
+    }
+
+    setStartAddress(
+      selectedVehicle.station !== "Location unavailable"
+        ? selectedVehicle.station
+        : "Vehicle location unavailable",
+    );
+  }, [city, selectedVehicle]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadAvailableVehicles() {
+      try {
+        const response = await apiFetch("/api/vehicles/status/AVAILABLE");
+        if (!response.ok) {
+          throw new Error(`Failed to fetch vehicles (${response.status})`);
+        }
+
+        const data = (await response.json()) as VehicleApiResponse[];
+        if (!isMounted) {
+          return;
+        }
+
+        const mappedVehicles = mapVehiclesToCatalog(data).filter((vehicle) => vehicle.available);
+        if (mappedVehicles.length === 0) {
+          setAvailableVehicles([]);
+          setVehicleError("No live available vehicles found.");
+          return;
+        }
+
+        setAvailableVehicles(mappedVehicles);
+        setVehicleError(null);
+      } catch {
+        if (isMounted) {
+          setAvailableVehicles([]);
+          setVehicleError("Unable to load live vehicles.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingVehicles(false);
+        }
+      }
+    }
+
+    void loadAvailableVehicles();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const query = city.trim();
+    if (query.length < 2) {
+      setCitySuggestions([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await apiFetch(
+          `/api/locations/cities?query=${encodeURIComponent(query)}&limit=6`,
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch city suggestions (${response.status})`);
+        }
+
+        const suggestions = (await response.json()) as string[];
+        if (!isCancelled) {
+          setCitySuggestions(suggestions);
+        }
+      } catch {
+        if (!isCancelled) {
+          setCitySuggestions([]);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [city]);
+
+  useEffect(() => {
+    const query = endAddress.trim();
+    if (query.length < 3) {
+      setEndAddressSuggestions([]);
+      return;
+    }
+
+    const cityQuery = city.trim();
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const cityPart = cityQuery.length > 0
+          ? `&city=${encodeURIComponent(cityQuery)}`
+          : "";
+        const response = await apiFetch(
+          `/api/locations/suggestions?query=${encodeURIComponent(query)}${cityPart}&limit=6`,
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch address suggestions (${response.status})`);
+        }
+
+        const suggestions = (await response.json()) as AddressSuggestion[];
+        if (!isCancelled) {
+          setEndAddressSuggestions(suggestions);
+        }
+      } catch {
+        if (!isCancelled) {
+          setEndAddressSuggestions([]);
+        }
+      }
+    }, 250);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [city, endAddress]);
+
+  useEffect(() => {
+    if (city.trim().length > 0) {
+      return;
+    }
+
+    const matchingSuggestion = findExactAddressSuggestion(
+      endAddress,
+      endAddressSuggestions,
+    );
+    if (matchingSuggestion && matchingSuggestion.city.trim().length > 0) {
+      setCity(matchingSuggestion.city);
+    }
+  }, [city, endAddress, endAddressSuggestions]);
+
+  useEffect(() => {
+    if (availableVehicles.length === 0) {
+      setSelectedVehicleId(null);
+      return;
+    }
+
+    setSelectedVehicleId((previousId) => {
+      if (previousId !== null && availableVehicles.some((vehicle) => vehicle.id === previousId)) {
+        return previousId;
+      }
+
+      if (
+        typeof selectedState.selectedVehicleId === "number" &&
+        availableVehicles.some((vehicle) => vehicle.id === selectedState.selectedVehicleId)
+      ) {
+        return selectedState.selectedVehicleId;
+      }
+
+      return availableVehicles[0].id;
+    });
+  }, [availableVehicles, selectedState.selectedVehicleId]);
+
+  const selectedVehicleName = selectedVehicle?.name ?? "No vehicle selected";
+  const selectedVehicleProvider = selectedVehicle?.provider ?? "Unknown Provider";
+  const selectedVehicleCondition = selectedVehicle?.condition ?? "Unknown";
+
+  const selectedVehiclePricePerMinute = selectedVehicle?.pricePerMinute ?? 0;
+  const selectedVehiclePrice = `$${selectedVehiclePricePerMinute.toFixed(2)}`;
+
+  const durationMinutes = useMemo(() => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const millis = end.getTime() - start.getTime();
+    if (!Number.isFinite(millis) || millis <= 0) {
+      return 0;
+    }
+    return millis / (1000 * 60);
+  }, [startDate, endDate]);
+
+  const estimatedTotal = selectedVehiclePricePerMinute * durationMinutes;
 
   const routeStops = [
     {
       label: "From",
-      location: "Peel & Ste-Catherine",
-      dateTime: "Mar 18 - 2:00 PM",
+      location: startAddress.trim().length > 0 ? startAddress : "--",
+      dateTime: startDate.trim().length > 0 ? formatDateForDisplay(startDate) : "--",
     },
     {
       label: "To",
-      location: "Plateau Mont-Royal",
-      dateTime: "Mar 18 - 4:00 PM",
+      location: endAddress.trim().length > 0 ? endAddress : "--",
+      dateTime: endDate.trim().length > 0 ? formatDateForDisplay(endDate) : "--",
     },
   ];
+
+  const handleCreateReservation = async (
+    event: React.FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
+    if (selectedVehicleId === null) {
+      setSubmitError("Please select a vehicle first.");
+      return;
+    }
+
+    if (startDate.trim().length === 0 || endDate.trim().length === 0) {
+      setSubmitError("Start and end date/time are required.");
+      return;
+    }
+
+    if (city.trim().length === 0) {
+      setSubmitError("City is required.");
+      return;
+    }
+
+    if (endAddress.trim().length === 0) {
+      setSubmitError("End address is required.");
+      return;
+    }
+
+    const normalizedStart = normalizeDateTimeValue(startDate);
+    const normalizedEnd = normalizeDateTimeValue(endDate);
+
+    if (new Date(normalizedStart).getTime() >= new Date(normalizedEnd).getTime()) {
+      setSubmitError("Start date/time must be before end date/time.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await apiFetch(`/api/vehicles/${selectedVehicleId}/reservations`, {
+        method: "POST",
+        body: JSON.stringify({
+          endAddress: endAddress.trim(),
+          city: city.trim(),
+          startDate: normalizedStart,
+          endDate: normalizedEnd,
+        }),
+      });
+
+      if (!response.ok) {
+        const message = await readErrorMessage(
+          response,
+          "Could not create reservation.",
+        );
+        setSubmitError(message);
+        return;
+      }
+
+      const createdReservation = (await response.json()) as { reservationId: number };
+      setSubmitSuccess(
+        `Reservation #${createdReservation.reservationId} was created successfully.`,
+      );
+    } catch {
+      setSubmitError("Network error while creating reservation.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <>
@@ -44,6 +336,21 @@ export default function ReservationPage() {
         <header className="mb-4 border-b border-[#253047] pb-3">
           <h1 className="text-2xl font-bold tracking-tight text-cyan-400">Reservation</h1>
         </header>
+        {vehicleError && (
+          <div className="mb-3 rounded-xl border border-amber-500/70 bg-amber-500/20 px-4 py-2 text-sm text-amber-200">
+            {vehicleError}
+          </div>
+        )}
+        {submitError && (
+          <div className="mb-3 rounded-xl border border-red-500/70 bg-red-500/20 px-4 py-2 text-sm text-red-200">
+            {submitError}
+          </div>
+        )}
+        {submitSuccess && (
+          <div className="mb-3 rounded-xl border border-green-500/70 bg-green-500/20 px-4 py-2 text-sm text-green-200">
+            {submitSuccess}
+          </div>
+        )}
 
         <section className="grid gap-5 xl:grid-cols-[1.05fr_1fr]">
           <div className="space-y-5">
@@ -56,7 +363,7 @@ export default function ReservationPage() {
                   <p className="text-base text-gray-300">
                     {selectedVehicleProvider} - {selectedVehicleCondition} condition
                   </p>
-                  <p className="text-right text-3xl font-bold leading-none text-cyan-400">{selectedVehiclePrice}</p>
+                  <p className="text-right text-3xl font-bold leading-none text-cyan-400">{selectedVehiclePrice}/min</p>
                 </div>
 
                 {routeStops.map((stop) => (
@@ -70,100 +377,145 @@ export default function ReservationPage() {
                 <div className="border-y border-[#2d3d57] py-3.5 text-lg">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-200">Duration</span>
-                    <span className="font-semibold">2 hrs</span>
+                    <span className="font-semibold">{Math.round(durationMinutes)} min</span>
                   </div>
                 </div>
 
                 <div className="flex items-end justify-between text-2xl">
-                  <p className="font-semibold">Total</p>
-                  <p className="font-bold text-cyan-400">$7.00</p>
+                  <p className="font-semibold">Estimated Total</p>
+                  <p className="font-bold text-cyan-400">${estimatedTotal.toFixed(2)}</p>
                 </div>
               </div>
             </article>
 
-            <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
-              <h3 className="mb-3 text-2xl font-semibold">Active Rentals</h3>
-              <div className="rounded-xl border border-[#2b3b55] bg-[#14233d] px-4 py-3.5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-lg font-semibold">Toyota Corolla - Active</p>
-                    <p className="text-sm text-gray-300">Returns in 1h 22min</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="rounded-md bg-green-500/25 px-3 py-1 text-xs font-semibold text-green-400">In Use</p>
-                    <p className="mt-1.5 text-xl font-bold text-cyan-400">$18.00</p>
-                  </div>
-                </div>
-              </div>
-            </article>
           </div>
 
           <div className="space-y-5">
             <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] px-5 py-4">
-              <h2 className="mb-4 text-2xl font-semibold">Payment</h2>
+              <h2 className="mb-4 text-2xl font-semibold">Create Reservation</h2>
 
-              <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+              <form className="space-y-4" onSubmit={(event) => void handleCreateReservation(event)}>
                 <div>
-                  <label className="mb-1.5 block text-sm uppercase text-gray-300">Payment Method</label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      className="rounded-xl border border-[#50617c] bg-[#13233d] px-4 py-2.5 text-base font-semibold"
-                    >
-                      Credit Card
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-xl border border-[#50617c] bg-[#13233d] px-4 py-2.5 text-base font-semibold"
-                    >
-                      Debit Card
-                    </button>
-                  </div>
+                  <label htmlFor="vehicle" className="mb-1.5 block text-sm uppercase text-gray-300">
+                    Vehicle
+                  </label>
+                  <select
+                    id="vehicle"
+                    value={selectedVehicleId ?? ""}
+                    onChange={(event) => {
+                      const parsedVehicleId = Number(event.target.value);
+                      setSelectedVehicleId(Number.isFinite(parsedVehicleId) ? parsedVehicleId : null);
+                    }}
+                    className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                    disabled={isLoadingVehicles}
+                  >
+                    {availableVehicles.length === 0 ? (
+                      <option value="">No vehicles available</option>
+                    ) : (
+                      availableVehicles.map((vehicle) => (
+                        <option key={vehicle.id} value={vehicle.id}>
+                          {vehicle.name} ({vehicle.priceLabel})
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
 
                 <div>
-                  <label htmlFor="card-number" className="mb-1.5 block text-sm uppercase text-gray-300">
-                    Card Number
+                  <label htmlFor="city" className="mb-1.5 block text-sm uppercase text-gray-300">
+                    City
                   </label>
                   <input
-                    id="card-number"
+                    id="city"
                     type="text"
-                    placeholder="••••"
+                    list="city-suggestion-list"
+                    value={city}
+                    onChange={(event) => setCity(event.target.value)}
                     className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none placeholder:text-gray-500"
                   />
+                  <datalist id="city-suggestion-list">
+                    {citySuggestions.map((suggestedCity) => (
+                      <option key={suggestedCity} value={suggestedCity} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="expiry" className="mb-1.5 block text-sm uppercase text-gray-300">
-                      Expiry
+                    <label htmlFor="start-date" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      Start Date/Time
                     </label>
                     <input
-                      id="expiry"
-                      type="text"
-                      defaultValue="09/27"
+                      id="start-date"
+                      type="datetime-local"
+                      value={startDate}
+                      onChange={(event) => setStartDate(event.target.value)}
                       className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="cvv" className="mb-1.5 block text-sm uppercase text-gray-300">
-                      CVV
+                    <label htmlFor="end-date" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Date/Time
                     </label>
                     <input
-                      id="cvv"
-                      type="password"
-                      placeholder="•••"
+                      id="end-date"
+                      type="datetime-local"
+                      value={endDate}
+                      onChange={(event) => setEndDate(event.target.value)}
                       className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
                     />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="start-address" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      Start Address
+                    </label>
+                    <input
+                      id="start-address"
+                      type="text"
+                      value={startAddress}
+                      readOnly
+                      className="w-full cursor-not-allowed rounded-xl border border-[#50617c] bg-[#0f1c33] px-3 py-2.5 text-base text-gray-200 outline-none"
+                    />
+                    <p className="mt-1 text-xs text-gray-400">
+                      Fixed to selected vehicle location.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="end-address" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Address
+                    </label>
+                    <input
+                      id="end-address"
+                      type="text"
+                      list="end-address-suggestion-list"
+                      value={endAddress}
+                      onChange={(event) => setEndAddress(event.target.value)}
+                      placeholder="e.g. 800 Rue du Square-Victoria"
+                      className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                    />
+                    <datalist id="end-address-suggestion-list">
+                      {endAddressSuggestions.map((suggestion) => (
+                        <option
+                          key={`${suggestion.address}-${suggestion.latitude}-${suggestion.longitude}`}
+                          value={suggestion.address}
+                          label={suggestion.city}
+                        />
+                      ))}
+                    </datalist>
                   </div>
                 </div>
 
                 <button
                   type="submit"
+                  disabled={isSubmitting || selectedVehicleId === null}
                   className="w-full rounded-xl bg-cyan-400 px-5 py-2.5 text-xl font-semibold text-slate-950 transition hover:bg-cyan-300"
                 >
-                  Pay $7.91 & Confirm Booking
+                  {isSubmitting ? "Creating Reservation..." : `Reserve for ${selectedVehiclePrice}/min`}
                 </button>
               </form>
             </article>
@@ -180,4 +532,65 @@ export default function ReservationPage() {
       </main>
     </>
   );
+}
+
+function findExactAddressSuggestion(
+  value: string,
+  suggestions: AddressSuggestion[],
+): AddressSuggestion | null {
+  const normalizedValue = value.trim().toLowerCase();
+  if (normalizedValue.length === 0) {
+    return null;
+  }
+
+  return (
+    suggestions.find(
+      (suggestion) => suggestion.address.trim().toLowerCase() === normalizedValue,
+    ) ?? null
+  );
+}
+
+function addHours(date: Date, hours: number): Date {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function toDateTimeInputValue(date: Date): string {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function normalizeDateTimeValue(value: string): string {
+  return value.length === 16 ? `${value}:00` : value;
+}
+
+function formatDateForDisplay(value: string): string {
+  const parsedDate = new Date(value);
+  if (!Number.isFinite(parsedDate.getTime())) {
+    return value;
+  }
+
+  return parsedDate.toLocaleString();
+}
+
+async function readErrorMessage(
+  response: Response,
+  fallbackMessage: string,
+): Promise<string> {
+  try {
+    const data = (await response.json()) as {
+      message?: string;
+      error?: string;
+    };
+
+    if (typeof data.message === "string" && data.message.trim().length > 0) {
+      return data.message;
+    }
+    if (typeof data.error === "string" && data.error.trim().length > 0) {
+      return data.error;
+    }
+  } catch {
+    // Ignore parse errors and use fallback.
+  }
+
+  return `${fallbackMessage} (${response.status})`;
 }

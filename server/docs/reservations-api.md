@@ -17,6 +17,7 @@ Authorization: Bearer <your-jwt-token>
 - **Method:** `POST`
 - **Path:** `/api/vehicles/{vehicleId}/reservations`
 - **Description:** Creates a reservation for a specific vehicle for the authenticated user.
+- **Note:** The reservation start location is fixed to the selected vehicle's current location. Only `endAddress` is provided by the client and geocoded in the backend.
 
 ### Example Request
 
@@ -28,14 +29,7 @@ Content-Type: application/json
 
 ```json
 {
-  "startLocation": {
-    "latitude": 45.5017,
-    "longitude": -73.5673
-  },
-  "endLocation": {
-    "latitude": 45.5088,
-    "longitude": -73.5617
-  },
+  "endAddress": "800 Rue du Square-Victoria",
   "city": "Montreal",
   "startDate": "2026-03-25T09:00:00",
   "endDate": "2026-03-25T10:30:00"
@@ -184,7 +178,7 @@ HTTP/1.1 204 No Content
 
 ```json
 {
-  "message": "Start location is required"
+  "message": "End address is required"
 }
 ```
 

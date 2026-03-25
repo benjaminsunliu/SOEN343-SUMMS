@@ -1,6 +1,5 @@
 package com.thehorselegend.summs.api.dto;
 
-import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -8,13 +7,8 @@ import java.time.LocalDateTime;
 
 public class VehicleReservationRequest {
 
-    @Valid
-    @NotNull(message = "Start location is required")
-    private LocationDto startLocation;
-
-    @Valid
-    @NotNull(message = "End location is required")
-    private LocationDto endLocation;
+    @NotBlank(message = "End address is required")
+    private String endAddress;
 
     @NotBlank(message = "City is required")
     private String city;
@@ -27,26 +21,22 @@ public class VehicleReservationRequest {
 
     public VehicleReservationRequest() {}
 
-    public VehicleReservationRequest(LocationDto startLocation,
-                                     LocationDto endLocation,
+    public VehicleReservationRequest(String endAddress,
                                      String city,
                                      LocalDateTime startDate,
                                      LocalDateTime endDate) {
-        this.startLocation = startLocation;
-        this.endLocation = endLocation;
+        this.endAddress = endAddress;
         this.city = city;
         this.startDate = startDate;
         this.endDate = endDate;
     }
 
-    public LocationDto getStartLocation() { return startLocation; }
-    public LocationDto getEndLocation() { return endLocation; }
+    public String getEndAddress() { return endAddress; }
     public String getCity() { return city; }
     public LocalDateTime getStartDate() { return startDate; }
     public LocalDateTime getEndDate() { return endDate; }
 
-    public void setStartLocation(LocationDto startLocation) { this.startLocation = startLocation; }
-    public void setEndLocation(LocationDto endLocation) { this.endLocation = endLocation; }
+    public void setEndAddress(String endAddress) { this.endAddress = endAddress; }
     public void setCity(String city) { this.city = city; }
     public void setStartDate(LocalDateTime startDate) { this.startDate = startDate; }
     public void setEndDate(LocalDateTime endDate) { this.endDate = endDate; }

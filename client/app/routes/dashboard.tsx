@@ -16,6 +16,13 @@ interface VehicleResponse {
   } | null;
 }
 
+interface ReservationSummary {
+  reservationId: number;
+  vehicleId: number;
+  city: string;
+  status: string;
+}
+
 // Default map center for dashboard when user location is not yet available
 const DEFAULT_CENTER: [number, number] = [45.5019, -73.5674];
 
@@ -32,10 +39,14 @@ export function meta({}: Route.MetaArgs) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [availableVehicles, setAvailableVehicles] = useState<VehicleResponse[]>([]);
+  const [activeReservations, setActiveReservations] = useState<number | null>(null);
+  const [reservations, setReservations] = useState<ReservationSummary[]>([]);
+  const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
 
   const [userLocation, setUserLocation] = useState<GeoLocation | null>(null);
+  const [hasPreciseUserLocation, setHasPreciseUserLocation] = useState(false);
   const [isLocating, setIsLocating] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -47,6 +58,7 @@ export default function DashboardPage() {
   }>({ temperature: null, windSpeed: null, humidity: null, description: null });
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
 
   useEffect(() => {
     // Fetch vehicles
@@ -84,6 +96,53 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadReservations() {
+      try {
+        const response = await apiFetch("/api/reservations");
+        if (!response.ok) {
+          throw new Error("Failed to load reservations");
+        }
+
+        const reservations = (await response.json()) as ReservationSummary[];
+        if (!isMounted) {
+          return;
+        }
+
+        const activeCount = reservations.filter(
+          (reservation) => reservation.status.toUpperCase() !== "CANCELLED",
+        ).length;
+        setReservations(reservations);
+        setActiveReservations(activeCount);
+      } catch {
+        if (isMounted) {
+          setReservations([]);
+          setActiveReservations(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingReservations(false);
+        }
+      }
+    }
+
+    void loadReservations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const activeBookingItems = useMemo(
+    () =>
+      reservations.filter(
+        (reservation) => reservation.status.toUpperCase() !== "CANCELLED",
+      ),
+    [reservations],
+  );
+
+  useEffect(() => {
     // Get browser location
     let isMounted = true;
 
@@ -93,6 +152,8 @@ export default function DashboardPage() {
         const loc = await getBrowserLocation();
         if (!isMounted) return;
         setUserLocation(loc);
+        setMapCenter([loc.latitude, loc.longitude]);
+        setHasPreciseUserLocation(true);
         setLocationError(null);
 
         // Fetch weather from Open-Meteo
@@ -139,10 +200,7 @@ export default function DashboardPage() {
             "We couldn't access your location. Showing generic Montreal conditions.",
           );
           setWeatherError("Unable to load live weather.");
-
-          // Fallback: use downtown Montreal coords
-          const fallback: GeoLocation = { latitude: 45.5019, longitude: -73.5674 };
-          setUserLocation((prev) => prev ?? fallback);
+          setHasPreciseUserLocation(false);
         }
       } finally {
         if (isMounted) {
@@ -160,7 +218,7 @@ export default function DashboardPage() {
   }, []);
 
   const mapMarkers: MapMarker[] = useMemo(() => {
-    return availableVehicles
+    const vehicleMarkers = availableVehicles
       .filter(
         (vehicle) =>
           vehicle.location !== null &&
@@ -168,10 +226,30 @@ export default function DashboardPage() {
           typeof vehicle.location.longitude === "number",
       )
       .map((vehicle) => ({
-        position: [vehicle.location!.latitude as number, vehicle.location!.longitude as number],
+        position: [
+          vehicle.location!.latitude as number,
+          vehicle.location!.longitude as number,
+        ] as [number, number],
         label: `${vehicle.type} #${vehicle.id}`,
+        kind: markerKindForVehicleType(vehicle.type),
       }));
-  }, [availableVehicles]);
+
+    if (hasPreciseUserLocation && userLocation) {
+      return [
+        {
+          position: [userLocation.latitude, userLocation.longitude] as [
+            number,
+            number,
+          ],
+          label: "You are here",
+          kind: "user",
+        },
+        ...vehicleMarkers,
+      ];
+    }
+
+    return vehicleMarkers;
+  }, [availableVehicles, hasPreciseUserLocation, userLocation]);
 
   const vehiclesByType = useMemo(() => {
     const counts = { bikes: 0, cars: 0, scooters: 0 };
@@ -188,7 +266,11 @@ export default function DashboardPage() {
   }, [availableVehicles]);
 
   const statCards = [
-    { label: "Active Rentals", value: "847", valueClass: "text-cyan-400" },
+    {
+      label: "Active Rentals",
+      value: activeReservations === null ? "--" : String(activeReservations),
+      valueClass: "text-cyan-400",
+    },
     {
       label: "Available Vehicles",
       value: String(availableVehicles.length),
@@ -256,11 +338,22 @@ export default function DashboardPage() {
              <div className="p-3.5">
                <div className="relative h-56 overflow-hidden rounded-lg border border-[#1f2e49]">
                  <MapView
-                   center={userLocation ? [userLocation.latitude, userLocation.longitude] : DEFAULT_CENTER}
+                   center={mapCenter}
                    zoom={13}
                    markers={mapMarkers}
                    className="h-full w-full rounded-lg overflow-hidden"
                  />
+                 {hasPreciseUserLocation && userLocation && (
+                   <button
+                     type="button"
+                     onClick={() =>
+                       setMapCenter([userLocation.latitude, userLocation.longitude])
+                     }
+                     className="absolute right-3 top-3 z-[500] rounded-md border border-cyan-300 bg-black/80 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-black"
+                   >
+                     My Location
+                   </button>
+                 )}
 
                  {isLoadingMap && (
                    <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-gray-200 bg-black/40">
@@ -308,16 +401,40 @@ export default function DashboardPage() {
             </article>
 
             <article className="rounded-xl border border-[#2a354a] bg-[#06142b]">
-              <h2 className="border-b border-[#2a354a] px-4 py-2.5 text-xl font-semibold">My Active Bookings</h2>
+              <div className="flex items-center justify-between border-b border-[#2a354a] px-4 py-2.5">
+                <h2 className="text-xl font-semibold">My Active Bookings</h2>
+                <button
+                  type="button"
+                  onClick={() => navigate("/my-reservations")}
+                  className="rounded-md border border-cyan-400 px-2.5 py-1 text-xs font-semibold text-cyan-300 transition hover:bg-cyan-500/15"
+                >
+                  View All
+                </button>
+              </div>
               <div className="space-y-3 p-3.5">
-                <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2">
-                  <p className="text-lg font-semibold">CarShare - Toyota Corolla</p>
-                  <p className="text-sm text-gray-300">Mar 18 - 2:00 PM to 5:00 PM</p>
-                </div>
-                <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2">
-                  <p className="text-lg font-semibold">Bike #B-01</p>
-                  <p className="text-sm text-gray-300">Mar 20 - All day</p>
-                </div>
+                {isLoadingReservations ? (
+                  <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2 text-sm text-gray-300">
+                    Loading active bookings...
+                  </div>
+                ) : activeBookingItems.length === 0 ? (
+                  <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2 text-sm text-gray-300">
+                    No active bookings.
+                  </div>
+                ) : (
+                  activeBookingItems.map((reservation) => (
+                    <div
+                      key={reservation.reservationId}
+                      className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2"
+                    >
+                      <p className="text-lg font-semibold">
+                        Reservation #{reservation.reservationId}
+                      </p>
+                      <p className="text-sm text-gray-300">
+                        Vehicle #{reservation.vehicleId} - {reservation.city}
+                      </p>
+                    </div>
+                  ))
+                )}
               </div>
             </article>
           </div>
@@ -340,4 +457,20 @@ function buildWeatherDescription(weatherCode: number | undefined): string | null
   if ([85, 86].includes(weatherCode)) return "Snow showers";
   if ([95, 96, 99].includes(weatherCode)) return "Thunderstorm";
   return "Mixed conditions";
+}
+
+function markerKindForVehicleType(
+  type: string,
+): "bike" | "car" | "scooter" | "vehicle" {
+  const normalizedType = type.toUpperCase();
+  if (normalizedType === "BICYCLE" || normalizedType === "BIKE") {
+    return "bike";
+  }
+  if (normalizedType === "SCOOTER") {
+    return "scooter";
+  }
+  if (normalizedType === "CAR") {
+    return "car";
+  }
+  return "vehicle";
 }

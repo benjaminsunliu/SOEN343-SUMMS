@@ -1,6 +1,7 @@
 package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
+import com.thehorselegend.summs.application.service.reservation.AddressGeocodingService;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Car;
 import com.thehorselegend.summs.domain.vehicle.Location;
@@ -32,6 +33,9 @@ class VehicleReservationServiceTest {
 
     @Mock
     private ReservationRepository reservationRepository;
+
+    @Mock
+    private AddressGeocodingService geocodingService;
 
     @InjectMocks
     private VehicleReservationService reservationService;

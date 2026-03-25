@@ -9,7 +9,6 @@ import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
-import com.thehorselegend.summs.api.dto.LocationDto;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,11 +21,14 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
 
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
+    private final AddressGeocodingService geocodingService;
 
     public VehicleReservationService(VehicleRepository vehicleRepository,
-                                     ReservationRepository reservationRepository) {
+                                     ReservationRepository reservationRepository,
+                                     AddressGeocodingService geocodingService) {
         this.vehicleRepository = vehicleRepository;
         this.reservationRepository = reservationRepository;
+        this.geocodingService = geocodingService;
     }
 
     @Override
@@ -80,8 +82,7 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
             Long userId,
             Long vehicleId,
             String city,
-            LocationDto startLocationDto,
-            LocationDto endLocationDto,
+            String endAddress,
             LocalDateTime startDate,
             LocalDateTime endDate
     ) {
@@ -89,17 +90,21 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
+        validateAvailability(vehicle, startDate, endDate);
+
+        Location startLocation = vehicle.getLocation();
+        Location endLocation = geocodingService.geocode(endAddress, city);
+
         VehicleReservation reservation = new VehicleReservation(
                 userId,
                 vehicleId,
                 startDate,
                 endDate,
                 city,
-                new Location(startLocationDto.latitude(), startLocationDto.longitude()),
-                new Location(endLocationDto.latitude(), endLocationDto.longitude())
+                startLocation,
+                endLocation
         );
 
-        validateAvailability(vehicle, startDate, endDate);
         reservation.confirm();
         return (VehicleReservation) saveReservation(reservation);
     }
