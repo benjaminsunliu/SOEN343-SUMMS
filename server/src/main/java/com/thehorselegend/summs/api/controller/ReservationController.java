@@ -1,7 +1,10 @@
 package com.thehorselegend.summs.api.controller;
 
+import com.thehorselegend.summs.api.dto.StartTripRequest;
+import com.thehorselegend.summs.api.dto.TripResponse;
 import com.thehorselegend.summs.api.dto.VehicleReservationRequest;
 import com.thehorselegend.summs.api.dto.VehicleReservationResponse;
+import com.thehorselegend.summs.application.service.RentalLifecycleService;
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
 import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
@@ -10,6 +13,7 @@ import com.thehorselegend.summs.infrastructure.persistence.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -25,15 +29,19 @@ public class ReservationController {
     private static final String VEHICLE_NOT_FOUND_MESSAGE = "Vehicle not found";
     private static final String RESERVATION_NOT_FOUND_MESSAGE = "Reservation not found";
     private static final String CANCEL_NOT_AUTHORIZED_MESSAGE = "User not authorized to cancel this reservation";
+    private static final String ACCESS_NOT_AUTHORIZED_MESSAGE = "User not authorized to access this reservation";
     private static final String ALREADY_CANCELLED_MESSAGE = "Reservation is already cancelled";
     private static final String GEOCODING_UNAVAILABLE_MESSAGE = "Geocoding service is unavailable";
 
     private final VehicleReservationService reservationService;
+    private final RentalLifecycleService rentalLifecycleService;
     private final UserRepository userRepository;
 
     public ReservationController(VehicleReservationService reservationService,
+                                 RentalLifecycleService rentalLifecycleService,
                                  UserRepository userRepository) {
         this.reservationService = reservationService;
+        this.rentalLifecycleService = rentalLifecycleService;
         this.userRepository = userRepository;
     }
 
@@ -59,6 +67,23 @@ public class ReservationController {
                 .toUri();
 
         return ResponseEntity.created(location).body(VehicleReservationResponse.fromDomain(reservation));
+    }
+
+    /**
+     * Starts a trip for an existing reservation owned by the authenticated user.
+     * Endpoint: POST /api/rentals/{reservationId}/start.
+     * Returns 201 Created with the trip payload.
+     */
+    @PostMapping("/rentals/{reservationId}/start")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN')")
+    public TripResponse startTripFromReservation(
+            @PathVariable Long reservationId,
+            Authentication authentication
+    ) {
+        Long userId = resolveAuthenticatedUserId(authentication);
+        String paymentAuthCode = "PAY-" + System.currentTimeMillis();
+        return rentalLifecycleService.startTrip(userId, new StartTripRequest(reservationId, paymentAuthCode));
     }
 
     /**
@@ -105,11 +130,7 @@ public class ReservationController {
             Authentication authentication
     ) {
         Long userId = resolveAuthenticatedUserId(authentication);
-        VehicleReservation reservation = fetchVehicleReservationById(reservationId);
-
-        if (!reservation.getUserId().equals(userId)) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have access to this reservation");
-        }
+        VehicleReservation reservation = fetchVehicleReservationById(reservationId, userId);
 
         return ResponseEntity.ok(VehicleReservationResponse.fromDomain(reservation));
     }
@@ -169,14 +190,19 @@ public class ReservationController {
         }
     }
 
-    private VehicleReservation fetchVehicleReservationById(Long reservationId) {
+    private VehicleReservation fetchVehicleReservationById(Long reservationId, Long userId) {
         try {
-            return toVehicleReservation(reservationService.getReservationById(reservationId));
+            return toVehicleReservation(reservationService.getUserReservationById(reservationId, userId));
         } catch (IllegalArgumentException ex) {
             if (RESERVATION_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
             }
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        } catch (IllegalStateException ex) {
+            if (ACCESS_NOT_AUTHORIZED_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have access to this reservation");
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
         }
     }
 

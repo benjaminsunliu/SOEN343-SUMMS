@@ -5,10 +5,12 @@ import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Vehicle;
+import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
+import com.thehorselegend.summs.shared.time.SummsTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -133,10 +135,12 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
         return ReservationMapper.toDomain(savedEntity);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<Reservation> getUserReservations(Long userId) {
+        LocalDateTime now = SummsTime.now();
         return reservationRepository.findByUserId(userId).stream()
                 .map(ReservationMapper::toDomain)
+                .map(reservation -> expireReservationIfNeeded(reservation, now))
                 .collect(Collectors.toList());
     }
 
@@ -145,5 +149,38 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
         var entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
         return ReservationMapper.toDomain(entity);
+    }
+
+    @Transactional
+    public Reservation getUserReservationById(Long reservationId, Long userId) {
+        Reservation reservation = getReservationById(reservationId);
+        if (!reservation.getUserId().equals(userId)) {
+            throw new IllegalStateException("User not authorized to access this reservation");
+        }
+        return expireReservationIfNeeded(reservation, SummsTime.now());
+    }
+
+    private Reservation expireReservationIfNeeded(Reservation reservation, LocalDateTime now) {
+        ReservationStatus status = reservation.getStatus();
+        boolean isExpirable = status == ReservationStatus.PENDING || status == ReservationStatus.CONFIRMED;
+        if (!isExpirable || reservation.getEndDate().isAfter(now)) {
+            return reservation;
+        }
+
+        reservation.expire();
+        Reservation expiredReservation = ReservationMapper.toDomain(
+                reservationRepository.save(ReservationMapper.toEntity(reservation))
+        );
+
+        vehicleRepository.findById(reservation.getReservableId())
+                .map(VehicleMapper::toDomain)
+                .ifPresent(vehicle -> {
+                    if (vehicle.getStatus() == VehicleStatus.RESERVED) {
+                        vehicle.makeAvailable();
+                        vehicleRepository.save(VehicleMapper.toEntity(vehicle));
+                    }
+                });
+
+        return expiredReservation;
     }
 }

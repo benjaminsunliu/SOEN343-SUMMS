@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router";
 import { SiteNav } from "../root";
-import { useLocation } from "react-router";
 import { apiFetch } from "../utils/api";
+import { getAuthUser } from "../utils/auth";
 import {
   mapVehiclesToCatalog,
   type VehicleApiResponse,
@@ -27,8 +28,60 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+interface TripStartResponse {
+  tripId: number;
+  reservationId: number;
+  vehicleId: number;
+  citizenId: number;
+  startTime: string;
+  endTime: string | null;
+  totalDurationMinutes: number | null;
+  vehicleStatus: string;
+}
+
+interface VehicleOption {
+  id: number;
+  type: string;
+  status: string;
+  providerId: number;
+  costPerMinute: number;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+interface ReservationResponse {
+  reservationId: number;
+  userId: number;
+  vehicleId: number;
+  city: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  startLocation: {
+    latitude: number;
+    longitude: number;
+  };
+  endLocation: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
 export default function ReservationPage() {
+  const navigate = useNavigate();
   const location = useLocation();
+  const authUser = useMemo(() => getAuthUser(), []);
   const selectedState = (location.state as ReservationState | null) ?? {};
   const [availableVehicles, setAvailableVehicles] = useState<VehicleCatalogItem[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(
@@ -320,7 +373,7 @@ export default function ReservationPage() {
 
       const createdReservation = (await response.json()) as { reservationId: number };
       setSubmitSuccess(
-        `Reservation #${createdReservation.reservationId} was created successfully.`,
+        `Reservation #${createdReservation.reservationId} created. Go to "My Reservations" to start your trip.`,
       );
     } catch {
       setSubmitError("Network error while creating reservation.");
