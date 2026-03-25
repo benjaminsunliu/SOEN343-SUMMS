@@ -13,6 +13,9 @@ public class TripEntity {
     private Long id;
 
     @Column(nullable = false)
+    private Long reservationId;
+
+    @Column(nullable = false)
     private Long vehicleId;
 
     @Column(nullable = false)
@@ -32,12 +35,14 @@ public class TripEntity {
 
     public TripEntity(
             Long id,
+            Long reservationId,
             Long vehicleId,
             Long citizenId,
             LocalDateTime startTime,
             LocalDateTime endTime,
             Long totalDurationMinutes) {
         this.id = id;
+        this.reservationId = reservationId;
         this.vehicleId = vehicleId;
         this.citizenId = citizenId;
         this.startTime = startTime;
@@ -51,6 +56,10 @@ public class TripEntity {
 
     public Long getVehicleId() {
         return vehicleId;
+    }
+
+    public Long getReservationId() {
+        return reservationId;
     }
 
     public Long getCitizenId() {
@@ -75,6 +84,10 @@ public class TripEntity {
 
     public void setVehicleId(Long vehicleId) {
         this.vehicleId = vehicleId;
+    }
+
+    public void setReservationId(Long reservationId) {
+        this.reservationId = reservationId;
     }
 
     public void setCitizenId(Long citizenId) {

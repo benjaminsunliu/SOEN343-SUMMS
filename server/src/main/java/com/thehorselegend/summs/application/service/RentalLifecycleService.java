@@ -4,16 +4,21 @@ import com.thehorselegend.summs.api.dto.EndTripRequest;
 import com.thehorselegend.summs.api.dto.LocationDto;
 import com.thehorselegend.summs.api.dto.StartTripRequest;
 import com.thehorselegend.summs.api.dto.TripResponse;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
+import com.thehorselegend.summs.domain.reservation.VehicleReservation;
+import com.thehorselegend.summs.domain.trip.Trip;
+import com.thehorselegend.summs.domain.vehicle.Location;
+import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
-import com.thehorselegend.summs.infrastructure.persistence.LocationEmbeddable;
-import com.thehorselegend.summs.infrastructure.persistence.TripEntity;
+import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
+import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
+import com.thehorselegend.summs.infrastructure.persistence.TripMapper;
 import com.thehorselegend.summs.infrastructure.persistence.TripRepository;
-import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
+import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
@@ -36,103 +41,116 @@ public class RentalLifecycleService {
 
     private final TripRepository tripRepository;
     private final VehicleRepository vehicleRepository;
+    private final ReservationRepository reservationRepository;
 
-    public RentalLifecycleService(TripRepository tripRepository, VehicleRepository vehicleRepository) {
+    public RentalLifecycleService(
+            TripRepository tripRepository,
+            VehicleRepository vehicleRepository,
+            ReservationRepository reservationRepository) {
         this.tripRepository = tripRepository;
         this.vehicleRepository = vehicleRepository;
+        this.reservationRepository = reservationRepository;
     }
 
     @Transactional
-    public TripResponse startTrip(StartTripRequest request) {
-        VehicleEntity vehicle = vehicleRepository.findById(request.vehicleId())
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + request.vehicleId()));
+    public TripResponse startTrip(Long citizenId, StartTripRequest request) {
+        VehicleReservation reservation = reservationRepository.findById(request.reservationId())
+                .map(ReservationMapper::toDomain)
+                .filter(VehicleReservation.class::isInstance)
+                .map(VehicleReservation.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Reservation not found with id: " + request.reservationId()));
 
-        validateReservation(request, vehicle);
+        validateReservation(reservation, citizenId);
         authorizePayment(request.paymentAuthorizationCode());
 
-        if (tripRepository.findByVehicleIdAndEndTimeIsNull(request.vehicleId()).isPresent()) {
+        Vehicle vehicle = vehicleRepository.findById(reservation.getReservableId())
+                .map(VehicleMapper::toDomain)
+                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + reservation.getReservableId()));
+
+        if (tripRepository.findByVehicleIdAndEndTimeIsNull(vehicle.getId()).isPresent()) {
             throw new IllegalArgumentException("Vehicle already has an active trip.");
         }
 
-        TripEntity trip = new TripEntity(
-                null,
-                request.vehicleId(),
-                request.citizenId(),
-                LocalDateTime.now(),
-                null,
-                null
-        );
+        if (tripRepository.findByCitizenIdAndEndTimeIsNull(citizenId).isPresent()) {
+            throw new IllegalArgumentException("Citizen already has an active trip.");
+        }
 
-        TripEntity savedTrip = tripRepository.save(trip);
+        reservation.activate();
+        reservationRepository.save(ReservationMapper.toEntity(reservation));
 
-        vehicle.setStatus(VehicleStatus.IN_USE);
-        VehicleEntity updatedVehicle = vehicleRepository.save(vehicle);
+        vehicle.startTrip();
+        vehicleRepository.save(VehicleMapper.toEntity(vehicle));
 
-        return toResponse(savedTrip, updatedVehicle.getStatus());
+        Trip trip = Trip.start(reservation.getId(), vehicle.getId(), citizenId, LocalDateTime.now());
+        Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(trip)));
+
+        return toResponse(savedTrip, vehicle.getStatus());
     }
 
     @Transactional
-    public TripResponse endTrip(Long tripId, EndTripRequest request) {
-        TripEntity trip = tripRepository.findById(tripId)
+    public TripResponse endTrip(Long citizenId, Long tripId, EndTripRequest request) {
+        Trip trip = tripRepository.findById(tripId)
+                .map(TripMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Trip not found with id: " + tripId));
 
-        if (trip.getEndTime() != null) {
-            throw new IllegalArgumentException("Trip has already been ended.");
+        if (!trip.getCitizenId().equals(citizenId)) {
+            throw new IllegalArgumentException("Trip does not belong to the authenticated citizen.");
         }
 
         if (!isValidDropOffZone(request.dropOffLocation())) {
             throw new IllegalArgumentException("Trip cannot be ended outside a valid drop-off zone.");
         }
 
-        VehicleEntity vehicle = vehicleRepository.findById(trip.getVehicleId())
+        Vehicle vehicle = vehicleRepository.findById(trip.getVehicleId())
+                .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        LocalDateTime endTime = LocalDateTime.now();
-        long durationMinutes = Math.max(0L, Duration.between(trip.getStartTime(), endTime).toMinutes());
-
-        trip.setEndTime(endTime);
-        trip.setTotalDurationMinutes(durationMinutes);
-        TripEntity savedTrip = tripRepository.save(trip);
+        trip.complete(LocalDateTime.now());
 
         LocationDto dropOffLocation = request.dropOffLocation();
-        vehicle.setLocation(new LocationEmbeddable(dropOffLocation.latitude(), dropOffLocation.longitude()));
-        vehicle.setStatus(VehicleStatus.AVAILABLE);
-        VehicleEntity updatedVehicle = vehicleRepository.save(vehicle);
+        vehicle.release(new Location(dropOffLocation.latitude(), dropOffLocation.longitude()));
 
-        return toResponse(savedTrip, updatedVehicle.getStatus());
+        Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(trip)));
+        vehicleRepository.save(VehicleMapper.toEntity(vehicle));
+
+        return toResponse(savedTrip, vehicle.getStatus());
     }
 
     public TripResponse getTripById(Long tripId) {
-        TripEntity trip = tripRepository.findById(tripId)
+        Trip trip = tripRepository.findById(tripId)
+                .map(TripMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Trip not found with id: " + tripId));
 
-        VehicleEntity vehicle = vehicleRepository.findById(trip.getVehicleId())
+        Vehicle vehicle = vehicleRepository.findById(trip.getVehicleId())
+                .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
         return toResponse(trip, vehicle.getStatus());
     }
 
     public TripResponse getActiveTripForCitizen(Long citizenId) {
-        TripEntity trip = tripRepository.findByCitizenIdAndEndTimeIsNull(citizenId)
+        Trip trip = tripRepository.findByCitizenIdAndEndTimeIsNull(citizenId)
+                .map(TripMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("No active trip found for citizen id: " + citizenId));
 
-        VehicleEntity vehicle = vehicleRepository.findById(trip.getVehicleId())
+        Vehicle vehicle = vehicleRepository.findById(trip.getVehicleId())
+                .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
         return toResponse(trip, vehicle.getStatus());
     }
 
-    private void validateReservation(StartTripRequest request, VehicleEntity vehicle) {
-        if (vehicle.getStatus() != VehicleStatus.RESERVED) {
-            throw new IllegalArgumentException("Vehicle must be in RESERVED status before starting a trip.");
+    private void validateReservation(VehicleReservation reservation, Long citizenId) {
+        if (!reservation.getUserId().equals(citizenId)) {
+            throw new IllegalArgumentException("Reservation does not belong to the authenticated citizen.");
         }
 
-        if (request.reservationValidUntil().isBefore(LocalDateTime.now())) {
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new IllegalArgumentException("Reservation must be confirmed before starting a trip.");
+        }
+
+        if (reservation.getEndDate().isBefore(LocalDateTime.now())) {
             throw new IllegalArgumentException("Reservation is expired.");
-        }
-
-        if (!request.reservationCode().startsWith("RES-")) {
-            throw new IllegalArgumentException("Reservation is invalid.");
         }
     }
 
@@ -164,9 +182,10 @@ public class RentalLifecycleService {
                 && longitude <= maxLon;
     }
 
-    private TripResponse toResponse(TripEntity trip, VehicleStatus vehicleStatus) {
+    private TripResponse toResponse(Trip trip, VehicleStatus vehicleStatus) {
         return new TripResponse(
                 trip.getId(),
+                trip.getReservationId(),
                 trip.getVehicleId(),
                 trip.getCitizenId(),
                 trip.getStartTime(),

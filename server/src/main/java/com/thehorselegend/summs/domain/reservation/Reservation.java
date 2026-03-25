@@ -39,9 +39,26 @@ public abstract class Reservation {
         this.status = ReservationStatus.CONFIRMED;
     }
 
+    public void activate() {
+        if (status != ReservationStatus.CONFIRMED) {
+            throw new IllegalStateException("Only confirmed reservations can be activated");
+        }
+        this.status = ReservationStatus.ACTIVE;
+    }
+
+    public void complete() {
+        if (status != ReservationStatus.ACTIVE) {
+            throw new IllegalStateException("Only active reservations can be completed");
+        }
+        this.status = ReservationStatus.COMPLETED;
+    }
+
     public void cancel() {
         if (status == ReservationStatus.CANCELLED) {
             throw new IllegalStateException("Reservation is already cancelled");
+        }
+        if (status == ReservationStatus.ACTIVE) {
+            throw new IllegalStateException("Active reservations cannot be cancelled");
         }
         this.status = ReservationStatus.CANCELLED;
     }
