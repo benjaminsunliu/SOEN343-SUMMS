@@ -55,8 +55,8 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
                 start,
                 end,
                 "CITY",
-                vehicle.getLocation(), // start location
-                vehicle.getLocation()  // end location placeholder
+                vehicle.getLocation(),
+                vehicle.getLocation()
         );
     }
 

@@ -71,7 +71,6 @@ public class ReservationEntity {
         this.endLocation = endLocation;
     }
 
-    // Getters & Setters
     public Long getId() {
         return id;
     }

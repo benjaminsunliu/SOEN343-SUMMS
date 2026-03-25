@@ -69,13 +69,11 @@ public class ReservationController {
         // Cancel the reservation using the service
         reservationService.cancelReservation(reservationId, user.getId());
 
-        // Fetch the reservation and ensure it's a VehicleReservation
         Reservation reservation = reservationService.getReservationById(reservationId);
         if (!(reservation instanceof VehicleReservation vehicleReservation)) {
             throw new IllegalArgumentException("Reservation is not a vehicle reservation");
         }
 
-        // Fetch the associated vehicle
         Vehicle vehicle = vehicleRepository.findById(vehicleReservation.getReservableId())
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));

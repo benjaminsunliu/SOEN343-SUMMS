@@ -53,25 +53,21 @@ class VehicleReservationServiceTest {
     void setUp() {
         MockitoAnnotations.openMocks(this);
 
-        // Create domain vehicle
         vehicle = new Car(
                 vehicleId,
                 VehicleStatus.AVAILABLE,
                 start,
-                100L,        // providerId
-                0.5,         // costPerMinute
-                "ABC123",    // licensePlate
-                4            // seatingCapacity
+                100L,
+                0.5,
+                "ABC123",
+                4
         );
 
-        // Map to entity
         vehicleEntity = VehicleMapper.toEntity(vehicle);
 
-        // Mock repository behavior
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(vehicleEntity));
         when(vehicleRepository.save(any(VehicleEntity.class))).thenReturn(vehicleEntity);
 
-        // Create reservation
         reservation = new VehicleReservation(
                 userId,
                 vehicleId,
@@ -82,10 +78,8 @@ class VehicleReservationServiceTest {
                 end
         );
 
-        // Map to entity
         reservationEntity = ReservationMapper.toEntity(reservation);
 
-        // Mock repository behavior
         when(reservationRepository.save(any(ReservationEntity.class))).thenReturn(reservationEntity);
     }
 

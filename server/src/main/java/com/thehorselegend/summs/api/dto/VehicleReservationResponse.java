@@ -41,7 +41,6 @@ public class VehicleReservationResponse {
         );
     }
 
-    // Getters and setters
     public Long getReservationId() { return reservationId; }
     public void setReservationId(Long reservationId) { this.reservationId = reservationId; }
 

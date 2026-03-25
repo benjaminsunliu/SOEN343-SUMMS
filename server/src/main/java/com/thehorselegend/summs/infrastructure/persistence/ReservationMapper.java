@@ -59,7 +59,6 @@ public class ReservationMapper {
             );
         }
 
-        // TODO: handle other reservation types here
         throw new IllegalArgumentException("Unknown reservation type for entity ID " + entity.getId());
     }
 }
