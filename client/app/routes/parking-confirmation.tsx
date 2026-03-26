@@ -227,7 +227,7 @@ export default function ParkingConfirmationPage() {
 
   // Confirmation + payment form
   return (
-    <div className="flex flex-col h-full bg-gray-900 overflow-hidden">
+    <div className="flex flex-col h-full bg-gray-900 overflow-hidden ml-150">
 
       {/* Header */}
       <div className="px-7 py-5 border-b border-gray-800 flex items-center gap-3 shrink-0">
@@ -242,7 +242,7 @@ export default function ParkingConfirmationPage() {
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden items-center justify-center p-6">
 
         {/* LEFT — Summary */}
         <aside className="w-80 shrink-0 p-6 border-r border-gray-800 overflow-y-auto">
