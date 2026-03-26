@@ -50,7 +50,8 @@ class AdminAnalyticsServiceTest {
                 rentalAnalyticsService,
                 gatewayAnalyticsService
         );
-        GatewayAnalyticsResponseDto expectedDto = new GatewayAnalyticsResponseDto(null, null, null);
+        java.util.Map<String, java.util.List<com.thehorselegend.summs.api.dto.ApiAccessMetricDto>> emptyMetrics = new java.util.LinkedHashMap<>();
+        GatewayAnalyticsResponseDto expectedDto = new GatewayAnalyticsResponseDto(emptyMetrics);
 
         when(gatewayAnalyticsService.getAnalytics()).thenReturn(expectedDto);
 

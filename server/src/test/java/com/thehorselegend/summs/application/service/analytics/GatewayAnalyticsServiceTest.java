@@ -120,12 +120,13 @@ class GatewayAnalyticsServiceTest {
 
         // Assert
         assertNotNull(response);
-        assertNotNull(response.getMetricsForPast24Hours());
-        assertNotNull(response.getMetricsForPastWeek());
-        assertNotNull(response.getMetricsForPastMonth());
-        assertEquals(1, response.getMetricsForPast24Hours().size());
-        assertEquals(1, response.getMetricsForPastWeek().size());
-        assertEquals(1, response.getMetricsForPastMonth().size());
+        assertNotNull(response.getMetrics());
+        assertNotNull(response.getMetrics().get("TWENTY_FOUR_HOURS"));
+        assertNotNull(response.getMetrics().get("WEEK"));
+        assertNotNull(response.getMetrics().get("MONTH"));
+        assertEquals(1, response.getMetrics().get("TWENTY_FOUR_HOURS").size());
+        assertEquals(1, response.getMetrics().get("WEEK").size());
+        assertEquals(1, response.getMetrics().get("MONTH").size());
     }
 
     @Test
@@ -143,8 +144,9 @@ class GatewayAnalyticsServiceTest {
 
         // Assert
         assertNotNull(response);
-        assertTrue(response.getMetricsForPast24Hours().isEmpty());
-        assertTrue(response.getMetricsForPastWeek().isEmpty());
-        assertTrue(response.getMetricsForPastMonth().isEmpty());
+        assertNotNull(response.getMetrics());
+        assertTrue(response.getMetrics().get("TWENTY_FOUR_HOURS").isEmpty());
+        assertTrue(response.getMetrics().get("WEEK").isEmpty());
+        assertTrue(response.getMetrics().get("MONTH").isEmpty());
     }
 }

@@ -41,10 +41,10 @@ class ApiAccessEventListenerTest {
         eventListener.onApiAccess(event);
 
         // Assert
-        // Should record in all 3 time windows for VEHICLE_RESERVATION
-        verify(gatewayAnalyticsService).recordApiAccess("VEHICLE_RESERVATION", "24H");
-        verify(gatewayAnalyticsService).recordApiAccess("VEHICLE_RESERVATION", "WEEK");
-        verify(gatewayAnalyticsService).recordApiAccess("VEHICLE_RESERVATION", "MONTH");
+        // Should record in all 3 time windows for RESERVATION
+        verify(gatewayAnalyticsService).recordApiAccess("RESERVATION", "24H");
+        verify(gatewayAnalyticsService).recordApiAccess("RESERVATION", "WEEK");
+        verify(gatewayAnalyticsService).recordApiAccess("RESERVATION", "MONTH");
     }
 
     @Test
@@ -52,7 +52,7 @@ class ApiAccessEventListenerTest {
         // Arrange
         ApiAccessEvent event = new ApiAccessEvent(
                 this,
-                "/api/vehicles",
+                "/api/vehicles/search",
                 "GET",
                 200,
                 75L
@@ -68,11 +68,11 @@ class ApiAccessEventListenerTest {
     }
 
     @Test
-    void testOnApiAccess_LocationsEndpoint() {
+    void testOnApiAccess_ParkingEndpoint() {
         // Arrange
         ApiAccessEvent event = new ApiAccessEvent(
                 this,
-                "/api/locations",
+                "/api/services/parking",
                 "GET",
                 200,
                 50L
@@ -82,9 +82,29 @@ class ApiAccessEventListenerTest {
         eventListener.onApiAccess(event);
 
         // Assert
-        verify(gatewayAnalyticsService).recordApiAccess("GET_TRANSIT_DETAILS", "24H");
-        verify(gatewayAnalyticsService).recordApiAccess("GET_TRANSIT_DETAILS", "WEEK");
-        verify(gatewayAnalyticsService).recordApiAccess("GET_TRANSIT_DETAILS", "MONTH");
+        verify(gatewayAnalyticsService).recordApiAccess("PARKING", "24H");
+        verify(gatewayAnalyticsService).recordApiAccess("PARKING", "WEEK");
+        verify(gatewayAnalyticsService).recordApiAccess("PARKING", "MONTH");
+    }
+
+    @Test
+    void testOnApiAccess_PublicTransportEndpoint() {
+        // Arrange
+        ApiAccessEvent event = new ApiAccessEvent(
+                this,
+                "/api/services/public-transport",
+                "GET",
+                200,
+                50L
+        );
+
+        // Act
+        eventListener.onApiAccess(event);
+
+        // Assert
+        verify(gatewayAnalyticsService).recordApiAccess("PUBLIC_TRANSPORT", "24H");
+        verify(gatewayAnalyticsService).recordApiAccess("PUBLIC_TRANSPORT", "WEEK");
+        verify(gatewayAnalyticsService).recordApiAccess("PUBLIC_TRANSPORT", "MONTH");
     }
 
     @Test

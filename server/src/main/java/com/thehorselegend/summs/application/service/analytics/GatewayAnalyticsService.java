@@ -7,7 +7,9 @@ import com.thehorselegend.summs.infrastructure.persistence.ApiAccessMetricEntity
 import com.thehorselegend.summs.infrastructure.persistence.ApiAccessMetricRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
  // Service for gateway-level analytics using event-based strategy .
@@ -41,14 +43,16 @@ public class GatewayAnalyticsService {
 
     /**
      * Retrieve gateway analytics for all time windows.
-     * Returns API call counts per endpoint for 24h, week, and month periods.
+     * Returns API call counts per endpoint organized by time window.
      */
     public GatewayAnalyticsResponseDto getAnalytics() {
-        List<ApiAccessMetricDto> metrics24h = convertMetrics(apiAccessRepository.findByTimeWindow("24H"));
-        List<ApiAccessMetricDto> metricsWeek = convertMetrics(apiAccessRepository.findByTimeWindow("WEEK"));
-        List<ApiAccessMetricDto> metricsMonth = convertMetrics(apiAccessRepository.findByTimeWindow("MONTH"));
+        Map<String, List<ApiAccessMetricDto>> metricsMap = new LinkedHashMap<>();
+        
+        metricsMap.put("TWENTY_FOUR_HOURS", convertMetrics(apiAccessRepository.findByTimeWindow("24H")));
+        metricsMap.put("WEEK", convertMetrics(apiAccessRepository.findByTimeWindow("WEEK")));
+        metricsMap.put("MONTH", convertMetrics(apiAccessRepository.findByTimeWindow("MONTH")));
 
-        return new GatewayAnalyticsResponseDto(metrics24h, metricsWeek, metricsMonth);
+        return new GatewayAnalyticsResponseDto(metricsMap);
     }
 
     /**

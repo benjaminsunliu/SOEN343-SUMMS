@@ -1,48 +1,26 @@
 package com.thehorselegend.summs.api.dto;
 
 import java.util.List;
+import java.util.Map;
 
 // DTO for gateway-level analytics response.
-// Contains API access metrics for various time windows.
+// Contains API access metrics organized by time window.
 public class GatewayAnalyticsResponseDto {
 
-    private List<ApiAccessMetricDto> metricsForPast24Hours;
-    private List<ApiAccessMetricDto> metricsForPastWeek;
-    private List<ApiAccessMetricDto> metricsForPastMonth;
+    private Map<String, List<ApiAccessMetricDto>> metrics;
 
     public GatewayAnalyticsResponseDto() {
     }
 
-    public GatewayAnalyticsResponseDto(
-            List<ApiAccessMetricDto> metricsForPast24Hours,
-            List<ApiAccessMetricDto> metricsForPastWeek,
-            List<ApiAccessMetricDto> metricsForPastMonth) {
-        this.metricsForPast24Hours = metricsForPast24Hours;
-        this.metricsForPastWeek = metricsForPastWeek;
-        this.metricsForPastMonth = metricsForPastMonth;
+    public GatewayAnalyticsResponseDto(Map<String, List<ApiAccessMetricDto>> metrics) {
+        this.metrics = metrics;
     }
 
-    public List<ApiAccessMetricDto> getMetricsForPast24Hours() {
-        return metricsForPast24Hours;
+    public Map<String, List<ApiAccessMetricDto>> getMetrics() {
+        return metrics;
     }
 
-    public void setMetricsForPast24Hours(List<ApiAccessMetricDto> metricsForPast24Hours) {
-        this.metricsForPast24Hours = metricsForPast24Hours;
-    }
-
-    public List<ApiAccessMetricDto> getMetricsForPastWeek() {
-        return metricsForPastWeek;
-    }
-
-    public void setMetricsForPastWeek(List<ApiAccessMetricDto> metricsForPastWeek) {
-        this.metricsForPastWeek = metricsForPastWeek;
-    }
-
-    public List<ApiAccessMetricDto> getMetricsForPastMonth() {
-        return metricsForPastMonth;
-    }
-
-    public void setMetricsForPastMonth(List<ApiAccessMetricDto> metricsForPastMonth) {
-        this.metricsForPastMonth = metricsForPastMonth;
+    public void setMetrics(Map<String, List<ApiAccessMetricDto>> metrics) {
+        this.metrics = metrics;
     }
 }

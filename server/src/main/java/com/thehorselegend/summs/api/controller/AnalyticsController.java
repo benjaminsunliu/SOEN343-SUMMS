@@ -12,9 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST Controller for analytics operations.
  * Provides endpoints for both rental-service and gateway-level analytics.
- * 
  * All endpoints require ADMIN role access.
- * Follows the same structure as other controllers: receives requests, delegates to service, returns DTOs.
  */
 @RestController
 @RequestMapping("/api/admin/analytics")

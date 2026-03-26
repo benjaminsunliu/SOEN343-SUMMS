@@ -193,7 +193,7 @@ export default function AdminAnalyticsDashboard() {
               </div>
             )}
 
-            {gatewayAnalytics && !gatewayLoading && (
+            {gatewayAnalytics && !gatewayLoading && gatewayAnalytics.metrics && (
               <div className="space-y-6">
                 {Object.entries(gatewayAnalytics.metrics).map(([timeWindow, metrics]) => (
                   <div key={timeWindow}>
@@ -220,6 +220,10 @@ export default function AdminAnalyticsDashboard() {
                   </div>
                 ))}
               </div>
+            )}
+
+            {gatewayAnalytics && !gatewayLoading && (!gatewayAnalytics.metrics || Object.keys(gatewayAnalytics.metrics).length === 0) && (
+              <p className="text-gray-500 text-sm py-4">No gateway analytics available</p>
             )}
           </div>
         </div>

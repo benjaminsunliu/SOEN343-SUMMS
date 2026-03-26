@@ -36,12 +36,14 @@ public class ApiAccessEventListener {
     
     // Map raw endpoint path to a friendly analytics name. 
     private String mapEndpointName(String endpoint, String method) {
-        if (endpoint.contains("/reservations") && method.equals("POST")) {
-            return "VEHICLE_RESERVATION";
-        } else if (endpoint.contains("/locations") && method.equals("GET")) {
-            return "GET_TRANSIT_DETAILS";
-        } else if (endpoint.contains("/vehicles") && method.equals("GET")) {
+        if (endpoint.contains("/vehicles/search") && method.equals("GET")) {
             return "VEHICLE_SEARCH";
+        } else if (endpoint.contains("/reservations") && method.equals("POST")) {
+            return "RESERVATION";
+        } else if (endpoint.contains("/services/parking") && method.equals("GET")) {
+            return "PARKING";
+        } else if (endpoint.contains("/services/public-transport") && method.equals("GET")) {
+            return "PUBLIC_TRANSPORT";
         } else if (endpoint.contains("/vehicles") && (method.equals("POST") || method.equals("PUT"))) {
             return "VEHICLE_MANAGEMENT";
         }

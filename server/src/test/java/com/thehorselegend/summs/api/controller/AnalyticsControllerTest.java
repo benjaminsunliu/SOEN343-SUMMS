@@ -41,10 +41,12 @@ class AnalyticsControllerTest {
     void testGetGatewayAnalytics_ReturnsResponseFromService() {
         // Arrange
         AnalyticsController controller = new AnalyticsController(adminAnalyticsService);
+        java.util.Map<String, java.util.List<com.thehorselegend.summs.api.dto.ApiAccessMetricDto>> metricsMap = new java.util.LinkedHashMap<>();
+        metricsMap.put("TWENTY_FOUR_HOURS", new ArrayList<>());
+        metricsMap.put("WEEK", new ArrayList<>());
+        metricsMap.put("MONTH", new ArrayList<>());
         com.thehorselegend.summs.api.dto.GatewayAnalyticsResponseDto mockResponse =
-                new com.thehorselegend.summs.api.dto.GatewayAnalyticsResponseDto(
-                        new ArrayList<>(), new ArrayList<>(), new ArrayList<>()
-                );
+                new com.thehorselegend.summs.api.dto.GatewayAnalyticsResponseDto(metricsMap);
         when(adminAnalyticsService.getGatewayAnalytics()).thenReturn(mockResponse);
 
         // Act
@@ -52,6 +54,6 @@ class AnalyticsControllerTest {
 
         // Assert
         assertNotNull(result);
-        assertNotNull(result.getMetricsForPast24Hours());
+        assertNotNull(result.getMetrics());
     }
 }

@@ -22,6 +22,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(apiAccessInterceptor)
                 .addPathPatterns("/**")
-                .excludePathPatterns("/api/auth/**");  // Don't track auth endpoints
+                .excludePathPatterns("/api/auth/**", "/api/admin/analytics/**");  // Don't track auth or analytics endpoints
     }
 }
