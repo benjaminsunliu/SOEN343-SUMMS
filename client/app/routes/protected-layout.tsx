@@ -46,11 +46,11 @@ export default function ProtectedLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-900 overflow-hidden">
+    <div className="bg-gray-900 min-h-screen">
       <SiteNav />
-      <div className="flex-1 overflow-y-auto">
+      <main className="ml-56 min-h-screen overflow-y-auto">
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 }

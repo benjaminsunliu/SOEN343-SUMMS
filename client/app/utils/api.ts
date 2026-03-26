@@ -144,3 +144,64 @@ export async function createParkingReservation(
 
   return res.json();
 }
+
+export interface TransitSearchParams {
+  origin:      string;
+  destination: string;
+  date:        string;
+  time:        string;
+  type:        string; // "ALL" | "METRO" | "BUS" | "TRAIN" | "REM"
+}
+
+export interface TransitRoute {
+  routeId:         number;
+  lineNumber:      string;
+  lineName:        string;
+  type:            string;
+  origin:          string;
+  destination:     string;
+  departureTime:   string;
+  arrivalTime:     string;
+  durationMinutes: number;
+  transfers:       number;
+  fare:            number;
+  status:          "ON_TIME" | "DELAYED" | "DISRUPTED";
+  statusMessage:   string;
+  stops:           string[];
+  lineColor:       string;
+}
+
+export interface TransitLineStatus {
+  lineId:        string;
+  lineNumber:    string;
+  lineName:      string;
+  type:          string;
+  status:        "ON_TIME" | "DELAYED" | "DISRUPTED";
+  statusMessage: string;
+  lineColor:     string;
+}
+
+export async function searchTransitRoutes(
+  params: TransitSearchParams
+): Promise<TransitRoute[]> {
+  const query = new URLSearchParams({
+    origin:      params.origin,
+    destination: params.destination,
+    date:        params.date,
+    time:        params.time,
+    type:        params.type,
+  });
+
+  const res = await apiFetch(`/api/transit/routes?${query}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Transit service unavailable");
+  }
+  return res.json();
+}
+
+export async function fetchTransitLineStatuses(): Promise<TransitLineStatus[]> {
+  const res = await apiFetch("/api/transit/status");
+  if (!res.ok) throw new Error("Could not load line statuses");
+  return res.json();
+}
