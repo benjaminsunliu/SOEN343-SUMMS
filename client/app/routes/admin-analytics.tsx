@@ -1,6 +1,4 @@
-import { SiteNav } from "../root";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 import { apiFetch } from "../utils/api";
 import type { Route } from "./+types/dashboard";
 
@@ -38,8 +36,6 @@ export function meta({}: Route.MetaArgs) {
 }
 
 export default function AdminAnalyticsDashboard() {
-  const navigate = useNavigate();
-  
   // Rental analytics state
   const [rentalAnalytics, setRentalAnalytics] = useState<RentalAnalyticsResponse | null>(null);
   const [rentalLoading, setRentalLoading] = useState(true);
@@ -107,9 +103,8 @@ export default function AdminAnalyticsDashboard() {
   }, []);
 
   return (
-    <>
-      <SiteNav />
-      <main className="ml-56 p-8 bg-gray-900 min-h-screen">
+    <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">Admin Analytics Dashboard</h1>
           <p className="text-gray-400">Real-time system performance and usage metrics</p>
@@ -237,8 +232,8 @@ export default function AdminAnalyticsDashboard() {
             Refresh Data
           </button>
         </div>
-      </main>
-    </>
+      </div>
+    </main>
   );
 }
 
