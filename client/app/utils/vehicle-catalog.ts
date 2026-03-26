@@ -13,11 +13,20 @@ export interface VehicleApiResponse {
   maxRange: number | null;
   licensePlate: string | null;
   seatingCapacity: number | null;
+  weatherRisky?: boolean | null;
+  weatherRiskMessage?: string | null;
+}
+
+export interface ContextAwareVehicleSearchResponse {
+  weatherType: string;
+  weatherSeverity: string;
+  weatherAdvisory: string;
+  vehicles: VehicleApiResponse[];
 }
 
 export interface VehicleCatalogItem {
   id: number;
-  type: "Bike" | "Scooter" | "Car";
+  type: "Bicycle" | "Scooter" | "Car";
   rawType: string;
   name: string;
   provider: string;
@@ -31,6 +40,8 @@ export interface VehicleCatalogItem {
   distance: string;
   latitude: number | null;
   longitude: number | null;
+  weatherRisky: boolean;
+  weatherRiskMessage: string | null;
 }
 
 export const DEFAULT_MAP_CENTER: [number, number] = [45.5019, -73.5674];
@@ -69,13 +80,15 @@ export function mapVehicleToCatalog(
     distance: "Distance unavailable",
     latitude,
     longitude,
+    weatherRisky: vehicle.weatherRisky === true,
+    weatherRiskMessage: normalizeOptionalText(vehicle.weatherRiskMessage ?? null),
   };
 }
 
 function normalizeType(type: string): VehicleCatalogItem["type"] {
   const normalized = type.toUpperCase();
-  if (normalized === "BICYCLE" || normalized === "BIKE") {
-    return "Bike";
+  if (normalized === "BICYCLE") {
+    return "Bicycle";
   }
   if (normalized === "SCOOTER") {
     return "Scooter";
@@ -95,8 +108,8 @@ function formatName(
   vehicle: VehicleApiResponse,
   type: VehicleCatalogItem["type"],
 ): string {
-  if (type === "Bike") {
-    return `Bike #${vehicle.id}`;
+  if (type === "Bicycle") {
+    return `Bicycle #${vehicle.id}`;
   }
   if (type === "Scooter") {
     return `Scooter #${vehicle.id}`;
@@ -125,7 +138,7 @@ function formatEnergy(
   vehicle: VehicleApiResponse,
   type: VehicleCatalogItem["type"],
 ): string {
-  if (type === "Bike") {
+  if (type === "Bicycle") {
     return "Human-powered";
   }
   if (type === "Scooter") {
