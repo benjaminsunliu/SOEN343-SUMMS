@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { SiteNav } from "../root";
 import { apiFetch } from "../utils/api";
-import { setActiveTrip } from "../utils/trips";
 import type { Route } from "./+types/my-reservations";
 
 interface ReservationLocation {
@@ -46,7 +45,6 @@ export default function MyReservationsPage() {
   >({});
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [cancelingReservationIds, setCancelingReservationIds] = useState<number[]>([]);
-  const [startingReservationIds, setStartingReservationIds] = useState<number[]>([]);
   const [reservationError, setReservationError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -149,43 +147,10 @@ export default function MyReservationsPage() {
     };
   }, []);
 
-  const handleStartTrip = async (reservationId: number) => {
+  const handleStartTrip = (reservationId: number) => {
     setActionError(null);
     setActionMessage(null);
-    setStartingReservationIds((prev) => [...prev, reservationId]);
-
-    try {
-      const response = await apiFetch(`/api/rentals/${reservationId}/start`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        const message = await readErrorMessage(response, "Could not start trip.");
-        setActionError(message);
-        return;
-      }
-
-      const trip = (await response.json()) as {
-        tripId: number;
-        vehicleId: number;
-        citizenId: number;
-        startTime: string;
-      };
-
-      setActiveTrip({
-        tripId: trip.tripId,
-        reservationId,
-        vehicleId: trip.vehicleId,
-        citizenId: trip.citizenId,
-        startTime: trip.startTime,
-      });
-
-      navigate("/trips/active");
-    } catch {
-      setActionError("Network error while starting trip.");
-    } finally {
-      setStartingReservationIds((prev) => prev.filter((id) => id !== reservationId));
-    }
+    navigate(`/payment?reservationId=${reservationId}`);
   };
 
   const handleCancelReservation = async (reservationId: number) => {
@@ -276,7 +241,6 @@ export default function MyReservationsPage() {
                 const canCancel = normalizedStatus === "PENDING" || normalizedStatus === "CONFIRMED";
                 const isCompleted = normalizedStatus === "COMPLETED";
                 const isCanceling = cancelingReservationIds.includes(reservation.reservationId);
-                const isStarting = startingReservationIds.includes(reservation.reservationId);
                 const tripDetails = tripDetailsByReservationId[reservation.reservationId];
 
                 return (
@@ -338,11 +302,10 @@ export default function MyReservationsPage() {
                         {canStartTrip && (
                           <button
                             type="button"
-                            onClick={() => void handleStartTrip(reservation.reservationId)}
-                            disabled={isStarting}
-                            className="rounded-md bg-cyan-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-60"
+                            onClick={() => handleStartTrip(reservation.reservationId)}
+                            className="rounded-md bg-cyan-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-cyan-500"
                           >
-                            {isStarting ? "Starting..." : "Start Trip"}
+                            Pay & Start Trip
                           </button>
                         )}
                         {canCancel && (

@@ -26,15 +26,33 @@ interface VehicleResponse {
   seatingCapacity?: number;
 }
 
+interface ProviderTransaction {
+  id: number;
+  reservationId: number;
+  userId: number;
+  paymentMethod: string;
+  amount: number;
+  success: boolean;
+  processorTransactionId: string;
+  createdAt: string;
+}
+
 export default function ProviderOperationsPage() {
   const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
+  const [transactions, setTransactions] = useState<ProviderTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
   const authUser = getAuthUser();
   const providerId = authUser?.id;
 
   useEffect(() => {
     fetchVehicles();
+  }, [providerId]);
+
+  useEffect(() => {
+    fetchTransactions();
   }, [providerId]);
 
   const fetchVehicles = async () => {
@@ -56,6 +74,29 @@ export default function ProviderOperationsPage() {
       setVehicles([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchTransactions = async () => {
+    if (!providerId) {
+      setLoadingTransactions(false);
+      return;
+    }
+
+    setLoadingTransactions(true);
+    setTransactionError(null);
+    try {
+      const response = await apiFetch("/api/payments/transactions/provider/me");
+      if (!response.ok) {
+        throw new Error(`Failed to fetch transactions (${response.status})`);
+      }
+      const data = (await response.json()) as ProviderTransaction[];
+      setTransactions(data ?? []);
+    } catch (err) {
+      setTransactions([]);
+      setTransactionError(err instanceof Error ? err.message : "Failed to load transactions");
+    } finally {
+      setLoadingTransactions(false);
     }
   };
 
@@ -203,6 +244,68 @@ export default function ProviderOperationsPage() {
             </div>
           </div>
 
+          {/* Recent Payment Transactions */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">💳</span>
+              <h3 className="text-lg font-semibold text-white">Recent Payment Transactions</h3>
+            </div>
+            <p className="text-sm text-gray-400 mb-4">Payments tied to reservations on your vehicles</p>
+
+            {transactionError && (
+              <div className="mb-4 rounded border border-red-500 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+                {transactionError}
+              </div>
+            )}
+
+            {loadingTransactions ? (
+              <div className="py-6 text-center text-gray-400">Loading transactions...</div>
+            ) : transactions.length === 0 ? (
+              <div className="py-6 text-center text-gray-500">No payment transactions found yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Date</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Reservation</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">User</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Method</th>
+                      <th className="text-right font-semibold text-gray-300 py-3 px-4">Amount</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Status</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Transaction ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.slice(0, 12).map((transaction) => (
+                      <tr key={transaction.id} className="border-b border-gray-700 hover:bg-gray-700/40">
+                        <td className="py-3 px-4 text-gray-300">{formatDateTime(transaction.createdAt)}</td>
+                        <td className="py-3 px-4 text-gray-300">#{transaction.reservationId}</td>
+                        <td className="py-3 px-4 text-gray-400">#{transaction.userId}</td>
+                        <td className="py-3 px-4 text-gray-300">{transaction.paymentMethod}</td>
+                        <td className="py-3 px-4 text-right text-cyan-400">
+                          ${transaction.amount.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`rounded px-2 py-1 text-xs font-semibold ${
+                              transaction.success
+                                ? "bg-green-500/20 text-green-300 border border-green-500/50"
+                                : "bg-amber-500/20 text-amber-300 border border-amber-500/50"
+                            }`}
+                          >
+                            {transaction.success ? "SUCCESS" : "FAILED"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-400">{transaction.processorTransactionId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* Manage Vehicles Table */}
           <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
             <div className="flex justify-between items-center mb-4">
@@ -273,6 +376,14 @@ export default function ProviderOperationsPage() {
       </main>
     </>
   );
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
 }
 
 interface StatCardProps {

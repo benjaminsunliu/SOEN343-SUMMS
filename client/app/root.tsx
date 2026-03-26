@@ -67,6 +67,7 @@ const navSections: NavSection[] = [
       { label: "Find a Vehicle", to: "/vehicles/search" },
       { label: "Book / Reserve", to: "/reservation" },
       { label: "My Reservations", to: "/my-reservations" },
+      { label: "Profile", to: "/profile" },
       { label: "Active Trip", to: "/trips/active" },
     ],
   },
