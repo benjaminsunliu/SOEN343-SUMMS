@@ -134,11 +134,12 @@ public class VehicleController {
         return vehicleSearchService.findNearbyVehicles(lat, lon, radiusKm);
     }
 
-    // Context-aware (good/bad weather and no type) Test with: http://localhost:8080/api/vehicles/search?lat=45.5&lon=-73.5&radiusKm=500
-    // With context-aware, if weather is severe, then type filtering returns error message: "Cannot display bicycle/scooter as the weather is severe"
-    // Good weather! use type filter to test: http://localhost:8080/api/vehicles/search?lat=45.5&lon=-73.5&radiusKm=500&type=bicycle
+    // Context-aware search response:
+    // - Returns matching vehicles plus weather metadata.
+    // - Weather severity no longer removes vehicles; risky options are flagged with warnings.
+    // Example: http://localhost:8080/api/vehicles/search?lat=45.5&lon=-73.5&radiusKm=500&type=bicycle
     @GetMapping("search")
-    public List<Vehicle> searchVehicles(
+    public ContextAwareVehicleSearchResponse searchVehicles(
             @RequestParam double lat,
             @RequestParam double lon,
             @RequestParam(defaultValue = "5") double radiusKm,

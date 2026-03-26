@@ -1,5 +1,7 @@
 package com.thehorselegend.summs.application.service;
 
+import com.thehorselegend.summs.api.dto.ContextAwareVehicleResponse;
+import com.thehorselegend.summs.api.dto.ContextAwareVehicleSearchResponse;
 import com.thehorselegend.summs.api.weather.Severity;
 import com.thehorselegend.summs.api.weather.WeatherCondition;
 import com.thehorselegend.summs.domain.vehicle.Car;
@@ -59,9 +61,24 @@ public class VehicleSearchServiceTest {
         Mockito.when(weatherService.getCurrentWeather(45.5, -73.5))
                 .thenReturn(new WeatherCondition("Rain", Severity.HIGH));
 
-        List<Vehicle> filtered = vehicleSearchService.searchVehicles(45.5, -73.5, 500, null);
+        ContextAwareVehicleSearchResponse searchResponse =
+                vehicleSearchService.searchVehicles(45.5, -73.5, 500, null);
 
-        Assertions.assertEquals(1, filtered.size());
-        Assertions.assertTrue(filtered.get(0) instanceof Car);
+        Assertions.assertEquals("Rain", searchResponse.weatherType());
+        Assertions.assertEquals("HIGH", searchResponse.weatherSeverity());
+        Assertions.assertEquals(2, searchResponse.vehicles().size());
+
+        ContextAwareVehicleResponse carResponse = searchResponse.vehicles().stream()
+                .filter(vehicle -> "CAR".equals(vehicle.type()))
+                .findFirst()
+                .orElseThrow();
+        Assertions.assertFalse(Boolean.TRUE.equals(carResponse.weatherRisky()));
+
+        ContextAwareVehicleResponse scooterResponse = searchResponse.vehicles().stream()
+                .filter(vehicle -> "SCOOTER".equals(vehicle.type()))
+                .findFirst()
+                .orElseThrow();
+        Assertions.assertTrue(Boolean.TRUE.equals(scooterResponse.weatherRisky()));
+        Assertions.assertNotNull(scooterResponse.weatherRiskMessage());
     }
 }

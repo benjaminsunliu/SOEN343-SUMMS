@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { SiteNav } from "../root";
 import { MapView, type MapMarker } from "../components/MapView";
 import { apiFetch } from "../utils/api";
 import { getBrowserLocation, type GeoLocation } from "../utils/location";
 import {
+  type ContextAwareVehicleSearchResponse,
   DEFAULT_MAP_CENTER,
   mapVehiclesToCatalog,
   type VehicleApiResponse,
@@ -13,6 +14,15 @@ import {
 import type { Route } from "./+types/vehicle-search";
 
 type VehicleTypeFilter = "ALL" | VehicleCatalogItem["type"];
+type SearchResponsePayload =
+  | VehicleApiResponse[]
+  | ContextAwareVehicleSearchResponse;
+
+interface WeatherContextSummary {
+  type: string;
+  severity: string;
+  advisory: string;
+}
 
 const VEHICLE_TYPE_OPTIONS: Array<{
   value: VehicleTypeFilter;
@@ -23,6 +33,8 @@ const VEHICLE_TYPE_OPTIONS: Array<{
   { value: "Scooter", label: "Scooter" },
   { value: "Car", label: "Car" },
 ];
+
+const UNLIMITED_RADIUS_KM = 20050;
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -40,86 +52,103 @@ export default function VehicleSearchPage() {
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
   const [vehicleError, setVehicleError] = useState<string | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [weatherContext, setWeatherContext] = useState<WeatherContextSummary | null>(
+    null,
+  );
   const [selectedVehicleType, setSelectedVehicleType] =
     useState<VehicleTypeFilter>("ALL");
+  const [appliedVehicleType, setAppliedVehicleType] =
+    useState<VehicleTypeFilter>("ALL");
+  const [distanceInputKm, setDistanceInputKm] = useState("");
+  const [maxPriceInput, setMaxPriceInput] = useState("");
+  const [appliedDistanceKm, setAppliedDistanceKm] = useState<number | null>(null);
+  const [appliedMaxPricePerMinute, setAppliedMaxPricePerMinute] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     let isMounted = true;
 
+    async function loadAvailableVehicles() {
+      if (!userLocation) return;
 
-      async function loadAvailableVehicles() {
-          if (!userLocation) return; // wait for location
+      setIsLoadingVehicles(true);
 
-          setIsLoadingVehicles(true);
+      try {
+        const radiusKm = appliedDistanceKm ?? UNLIMITED_RADIUS_KM;
+        const appliedTypeParam =
+          appliedVehicleType !== "ALL"
+            ? `&type=${appliedVehicleType.toLowerCase()}`
+            : "";
+        const url = `/api/vehicles/search?lat=${userLocation.latitude}&lon=${userLocation.longitude}&radiusKm=${radiusKm}${appliedTypeParam}`;
 
-          try {
-              // Build URL with query parameters
-              const typeFilter =
-                  selectedVehicleType !== "ALL" ? selectedVehicleType.toLowerCase() : "";
-              const url = `/api/vehicles/search?lat=${userLocation.latitude}&lon=${userLocation.longitude}&radiusKm=500${typeFilter ? `&type=${typeFilter}` : ""}`;
+        const response = await apiFetch(url);
 
-              const response = await apiFetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch vehicles (${response.status})`);
+        }
 
-              if (!response.ok) {
-                  throw new Error(`Failed to fetch vehicles (${response.status})`);
-              }
+        const payload = (await response.json()) as SearchResponsePayload;
+        const { vehicles: searchVehicles, weather } = normalizeSearchPayload(payload);
 
-              const data = (await response.json()) as VehicleApiResponse[];
+        if (!isMounted) return;
 
-              if (!isMounted) return;
+        setWeatherContext(weather);
+        if (searchVehicles.length === 0) {
+          setVehicles([]);
+          const distanceLabel =
+            appliedDistanceKm === null ? "any distance" : `${appliedDistanceKm} km`;
+          setVehicleError(
+            appliedVehicleType === "ALL"
+              ? `No vehicles found within ${distanceLabel}.`
+              : `No ${appliedVehicleType} vehicles found within ${distanceLabel}.`,
+          );
+          return;
+        }
 
-              if (data.length === 0) {
-                  setVehicles([]);
-                  setVehicleError(
-                      typeFilter
-                          ? `No ${selectedVehicleType} vehicles available nearby.`
-                          : "No vehicles found nearby."
-                  );
-                  return;
-              }
-
-              setVehicles(mapVehiclesToCatalog(data));
-              setVehicleError(null);
-          } catch (err) {
-              if (!isMounted) return;
-              setVehicles([]);
-              setVehicleError("Unable to load live vehicles.");
-          } finally {
-              if (isMounted) setIsLoadingVehicles(false);
-          }
+        setVehicles(mapVehiclesToCatalog(searchVehicles));
+        setVehicleError(null);
+      } catch {
+        if (!isMounted) return;
+        setVehicles([]);
+        setWeatherContext(null);
+        setVehicleError("Unable to load live vehicles.");
+      } finally {
+        if (isMounted) setIsLoadingVehicles(false);
       }
+    }
 
-      void loadAvailableVehicles();
+    void loadAvailableVehicles();
 
-      return () => {
-          isMounted = false;
-      };
-  }, [userLocation, selectedVehicleType]);
+    return () => {
+      isMounted = false;
+    };
+  }, [appliedDistanceKm, appliedVehicleType, userLocation]);
 
   useEffect(() => {
     let isMounted = true;
 
-      async function locateUser() {
-          try {
-              const location = await getBrowserLocation();
-              if (!isMounted) return;
+    async function locateUser() {
+      try {
+        const location = await getBrowserLocation();
+        if (!isMounted) return;
 
-              setUserLocation(location);
-              setLocationError(null);
-          } catch {
-              if (!isMounted) return;
-              setUserLocation(null);
-              setLocationError(
-                  "Location unavailable. Enable browser location to show your position on the map."
-              );
-          }
+        setUserLocation(location);
+        setLocationError(null);
+      } catch {
+        if (!isMounted) return;
+        setUserLocation(null);
+        setLocationError(
+          "Location unavailable. Enable browser location to show your position on the map.",
+        );
       }
+    }
 
-      void locateUser();
+    void locateUser();
 
-      return () => {
-          isMounted = false;
-      };
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -138,17 +167,30 @@ export default function VehicleSearchPage() {
     () =>
       vehicles.map((vehicle) => ({
         ...vehicle,
-        distance: formatDistanceFromUser(vehicle, userLocation),
+        distanceKm: distanceKmFromUser(vehicle, userLocation),
+      })).map((vehicle) => ({
+        ...vehicle,
+        distance: formatDistanceFromDistanceKm(vehicle.distanceKm),
       })),
     [userLocation, vehicles],
   );
 
   const filteredVehicles = useMemo(
-    () =>
-      vehiclesWithDistance.filter((vehicle) =>
-        matchesVehicleTypeFilter(vehicle, selectedVehicleType),
-      ),
-    [selectedVehicleType, vehiclesWithDistance],
+    () => {
+      return vehiclesWithDistance.filter((vehicle) => {
+        const matchesType =
+          appliedVehicleType === "ALL" || vehicle.type === appliedVehicleType;
+        const withinDistance =
+          appliedDistanceKm === null ||
+          (typeof vehicle.distanceKm === "number" &&
+            vehicle.distanceKm <= appliedDistanceKm);
+        const withinPrice =
+          appliedMaxPricePerMinute === null ||
+          vehicle.pricePerMinute <= appliedMaxPricePerMinute;
+        return matchesType && withinDistance && withinPrice;
+      });
+    },
+    [appliedDistanceKm, appliedMaxPricePerMinute, appliedVehicleType, vehiclesWithDistance],
   );
 
   useEffect(() => {
@@ -207,13 +249,19 @@ export default function VehicleSearchPage() {
     : "$0.00";
   const conditionLabel = selectedVehicle?.condition ?? "Good";
 
-  const vehicleMarkers: MapMarker[] = filteredVehicles
-    .filter(hasCoordinates)
-    .map((vehicle) => ({
-      position: [vehicle.latitude, vehicle.longitude],
-      label: `${vehicle.name} (${vehicle.type})`,
-      kind: markerKindForVehicleType(vehicle.type),
-    }));
+  const vehicleMarkers: MapMarker[] = filteredVehicles.flatMap((vehicle) => {
+    if (!hasCoordinates(vehicle)) {
+      return [];
+    }
+
+    return [
+      {
+        position: [vehicle.latitude, vehicle.longitude],
+        label: `${vehicle.name} (${vehicle.type})`,
+        kind: markerKindForVehicleType(vehicle.type),
+      },
+    ];
+  });
 
   const markers: MapMarker[] = useMemo(() => {
     if (!userLocation) {
@@ -238,6 +286,40 @@ export default function VehicleSearchPage() {
     }
   }
 
+  function handleApplyFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedDistanceInput = distanceInputKm.trim();
+    let parsedDistanceKm: number | null = null;
+    if (normalizedDistanceInput.length > 0) {
+      parsedDistanceKm = parsePositiveNumber(normalizedDistanceInput);
+      if (parsedDistanceKm === null) {
+        setVehicleError("Distance must be a positive number in kilometers.");
+        return;
+      }
+    }
+
+    const normalizedPriceInput = maxPriceInput.trim();
+    if (normalizedPriceInput.length === 0) {
+      setAppliedVehicleType(selectedVehicleType);
+      setAppliedDistanceKm(parsedDistanceKm);
+      setAppliedMaxPricePerMinute(null);
+      setVehicleError(null);
+      return;
+    }
+
+    const parsedMaxPrice = Number(normalizedPriceInput);
+    if (!Number.isFinite(parsedMaxPrice) || parsedMaxPrice < 0) {
+      setVehicleError("Max price/min must be 0 or greater.");
+      return;
+    }
+
+    setAppliedVehicleType(selectedVehicleType);
+    setAppliedDistanceKm(parsedDistanceKm);
+    setAppliedMaxPricePerMinute(parsedMaxPrice);
+    setVehicleError(null);
+  }
+
   return (
     <>
       <SiteNav />
@@ -255,12 +337,23 @@ export default function VehicleSearchPage() {
             {locationError}
           </div>
         )}
+        {weatherContext && (
+          <div
+            className={`mb-3 rounded-xl border px-4 py-2 text-sm ${weatherBannerClasses(weatherContext.severity)}`}
+          >
+            <p className="font-semibold">
+              Weather: {formatWeatherType(weatherContext.type)} (
+              {weatherContext.severity})
+            </p>
+            <p>{weatherContext.advisory}</p>
+          </div>
+        )}
 
         <section className="grid gap-5 xl:grid-cols-[320px_1fr]">
           <article className="rounded-2xl border border-[#2a354a] bg-[#06142b] p-4">
             <h2 className="mb-3 border-b border-[#2a354a] pb-2 text-xl font-semibold">Search Filters</h2>
 
-            <form className="space-y-3" onSubmit={(event) => event.preventDefault()}>
+            <form className="space-y-3" onSubmit={handleApplyFilters}>
               <div>
                 <label className="mb-1.5 block text-xs uppercase tracking-wide text-gray-300">Vehicle Type</label>
                 <div className="grid grid-cols-4 gap-2 rounded-xl bg-[#14233d] p-1">
@@ -285,36 +378,17 @@ export default function VehicleSearchPage() {
               </div>
 
               <div>
-                <label htmlFor="city" className="mb-1.5 block text-xs uppercase tracking-wide text-gray-300">
-                  City
+                <label htmlFor="distance-km" className="mb-1.5 block text-xs uppercase tracking-wide text-gray-300">
+                  Distance From You (km)
                 </label>
                 <input
-                  id="city"
-                  type="text"
-                  placeholder="Enter city"
-                  className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2 text-sm outline-none"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="pickup" className="mb-1.5 block text-xs uppercase tracking-wide text-gray-300">
-                  Pickup Location
-                </label>
-                <input
-                  id="pickup"
-                  type="text"
-                  placeholder="Enter pickup location"
-                  className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2 text-sm outline-none"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="date" className="mb-1.5 block text-xs uppercase tracking-wide text-gray-300">
-                  Date
-                </label>
-                <input
-                  id="date"
-                  type="date"
+                  id="distance-km"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={distanceInputKm}
+                  onChange={(event) => setDistanceInputKm(event.target.value)}
+                  placeholder="Leave blank for unlimited"
                   className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2 text-sm outline-none"
                 />
               </div>
@@ -325,11 +399,25 @@ export default function VehicleSearchPage() {
                 </label>
                 <input
                   id="max-price"
-                  type="text"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={maxPriceInput}
+                  onChange={(event) => setMaxPriceInput(event.target.value)}
                   placeholder="Optional"
                   className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2 text-sm outline-none"
                 />
               </div>
+
+              <p className="text-xs text-gray-400">
+                Applied: {formatTypeFilterLabel(appliedVehicleType)},{" "}
+                {appliedDistanceKm === null
+                  ? "unlimited distance"
+                  : `within ${appliedDistanceKm.toFixed(1)} km`}
+                {appliedMaxPricePerMinute !== null
+                  ? ` and <= $${appliedMaxPricePerMinute.toFixed(2)}/min`
+                  : ""}
+              </p>
 
               <button
                 type="submit"
@@ -369,7 +457,7 @@ export default function VehicleSearchPage() {
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filteredVehicles.length === 0 ? (
                 <div className="rounded-xl border border-[#23324c] bg-[#06142b] p-4 text-sm text-gray-300">
-                  No vehicles found for this type.
+                  No vehicles match the current distance/price filters.
                 </div>
               ) : (
                 filteredVehicles.map((vehicle) => (
@@ -402,6 +490,11 @@ export default function VehicleSearchPage() {
                     <p className="mt-1 text-base text-gray-300">{vehicle.distance}</p>
                     <p className="mt-1 text-base text-gray-300">{vehicle.energy}</p>
                     <p className="mt-1 text-base text-gray-300">{vehicle.provider}</p>
+                    {vehicle.weatherRisky && vehicle.weatherRiskMessage && (
+                      <p className="mt-2 rounded-md border border-amber-500/60 bg-amber-500/15 px-2 py-1 text-xs font-semibold text-amber-200">
+                        {vehicle.weatherRiskMessage}
+                      </p>
+                    )}
                     <p
                       className={`mt-2.5 text-2xl font-bold ${
                         vehicle.available ? "text-cyan-400" : "text-gray-400"
@@ -435,6 +528,12 @@ export default function VehicleSearchPage() {
                   <p>Station: {selectedVehicle?.station ?? "--"}</p>
                   <p>Condition: {conditionLabel}</p>
                   <p>Provider: {selectedVehicle?.provider ?? "--"}</p>
+                  {selectedVehicle?.weatherRisky &&
+                    selectedVehicle.weatherRiskMessage && (
+                      <p className="rounded-md border border-amber-500/60 bg-amber-500/15 px-2 py-1 text-sm font-semibold text-amber-200">
+                        {selectedVehicle.weatherRiskMessage}
+                      </p>
+                    )}
                 </div>
 
                 <p className="text-4xl font-bold text-cyan-400">
@@ -473,6 +572,51 @@ export default function VehicleSearchPage() {
   );
 }
 
+function normalizeSearchPayload(payload: SearchResponsePayload): {
+  vehicles: VehicleApiResponse[];
+  weather: WeatherContextSummary | null;
+} {
+  if (isContextAwareSearchResponse(payload)) {
+    return {
+      vehicles: payload.vehicles,
+      weather: {
+        type: payload.weatherType,
+        severity: payload.weatherSeverity,
+        advisory: payload.weatherAdvisory,
+      },
+    };
+  }
+
+  return {
+    vehicles: payload,
+    weather: null,
+  };
+}
+
+function isContextAwareSearchResponse(
+  payload: SearchResponsePayload,
+): payload is ContextAwareVehicleSearchResponse {
+  return !Array.isArray(payload) && Array.isArray(payload.vehicles);
+}
+
+function formatWeatherType(type: string): string {
+  if (type === "PartlyCloudy") {
+    return "Partly Cloudy";
+  }
+  return type;
+}
+
+function weatherBannerClasses(severity: string): string {
+  const normalizedSeverity = severity.toUpperCase();
+  if (normalizedSeverity === "HIGH") {
+    return "border-amber-500/70 bg-amber-500/20 text-amber-200";
+  }
+  if (normalizedSeverity === "MEDIUM") {
+    return "border-blue-400/70 bg-blue-500/20 text-blue-100";
+  }
+  return "border-emerald-500/70 bg-emerald-500/15 text-emerald-100";
+}
+
 function hasCoordinates(
   vehicle: VehicleCatalogItem,
 ): vehicle is VehicleCatalogItem & { latitude: number; longitude: number } {
@@ -494,23 +638,16 @@ function markerKindForVehicleType(
   return "car";
 }
 
-function matchesVehicleTypeFilter(
-  vehicle: VehicleCatalogItem,
-  filter: VehicleTypeFilter,
-): boolean {
-  if (filter === "ALL") {
-    return true;
-  }
-
-  return vehicle.type === filter;
+function formatTypeFilterLabel(filter: VehicleTypeFilter): string {
+  return filter === "ALL" ? "all vehicle types" : `${filter.toLowerCase()} only`;
 }
 
-function formatDistanceFromUser(
+function distanceKmFromUser(
   vehicle: VehicleCatalogItem,
   userLocation: GeoLocation | null,
-): string {
+): number | null {
   if (!userLocation || !hasCoordinates(vehicle)) {
-    return "Distance unavailable";
+    return null;
   }
 
   const distanceKm = haversineDistanceKm(
@@ -521,6 +658,14 @@ function formatDistanceFromUser(
   );
 
   if (!Number.isFinite(distanceKm)) {
+    return null;
+  }
+
+  return distanceKm;
+}
+
+function formatDistanceFromDistanceKm(distanceKm: number | null): string {
+  if (distanceKm === null) {
     return "Distance unavailable";
   }
 
@@ -529,6 +674,14 @@ function formatDistanceFromUser(
   }
 
   return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km away`;
+}
+
+function parsePositiveNumber(value: string): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
 }
 
 function haversineDistanceKm(

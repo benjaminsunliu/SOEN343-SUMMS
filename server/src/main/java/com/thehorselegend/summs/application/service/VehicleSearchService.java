@@ -1,6 +1,8 @@
 package com.thehorselegend.summs.application.service;
 
-import com.thehorselegend.summs.api.exception.VehicleUnavailableException;
+import com.thehorselegend.summs.api.dto.ContextAwareVehicleResponse;
+import com.thehorselegend.summs.api.dto.ContextAwareVehicleSearchResponse;
+import com.thehorselegend.summs.api.dto.LocationDto;
 import com.thehorselegend.summs.api.weather.Severity;
 import com.thehorselegend.summs.api.weather.WeatherCondition;
 import com.thehorselegend.summs.domain.vehicle.*;
@@ -32,38 +34,26 @@ public class VehicleSearchService {
                 .collect(Collectors.toList());
     }
 
-    public List<Vehicle> searchVehicles(double userLat, double userLon, double radiusKm, String typeFilter) {
+    public ContextAwareVehicleSearchResponse searchVehicles(
+            double userLat,
+            double userLon,
+            double radiusKm,
+            String typeFilter
+    ) {
         List<Vehicle> nearbyVehicles = findNearbyVehicles(userLat, userLon, radiusKm);
+        List<Vehicle> filteredByType = applyTypeFilter(nearbyVehicles, typeFilter);
+        WeatherCondition weather = resolveWeatherCondition(userLat, userLon);
 
-        if (nearbyVehicles.isEmpty()) {
-            return nearbyVehicles;
-        }
+        List<ContextAwareVehicleResponse> contextAwareVehicles = filteredByType.stream()
+                .map(vehicle -> vehicleToContextAwareResponse(vehicle, weather))
+                .collect(Collectors.toList());
 
-        WeatherCondition weather = weatherService.getCurrentWeather(userLat, userLon);
-        //WeatherCondition weather = new WeatherCondition("Rain", Severity.HIGH); // Test
-
-        List<Vehicle> filteredByWeather;
-
-        if (weather.getSeverity() == Severity.HIGH) {
-            if (typeFilter != null && !typeFilter.equalsIgnoreCase("car")) {
-                throw new VehicleUnavailableException(
-                        "Cannot display " + typeFilter + " as the weather is severe"
-                );
-            }
-            filteredByWeather = nearbyVehicles.stream()
-                    .filter(v -> v instanceof Car)
-                    .collect(Collectors.toList());
-        } else {
-            filteredByWeather = nearbyVehicles;
-        }
-
-        if (typeFilter != null && !typeFilter.isEmpty()) {
-            filteredByWeather = filteredByWeather.stream()
-                    .filter(v -> matchesType(v, typeFilter))
-                    .collect(Collectors.toList());
-        }
-
-        return filteredByWeather;
+        return new ContextAwareVehicleSearchResponse(
+                weather.getType(),
+                weather.getSeverity().name(),
+                buildWeatherAdvisory(weather),
+                contextAwareVehicles
+        );
     }
 
     private boolean matchesType(Vehicle vehicle, String typeFilter) {
@@ -73,6 +63,96 @@ public class VehicleSearchService {
             case "bicycle": return vehicle instanceof Bicycle;
             default: return false;
         }
+    }
+
+    private List<Vehicle> applyTypeFilter(List<Vehicle> vehicles, String typeFilter) {
+        if (typeFilter == null || typeFilter.isBlank()) {
+            return vehicles;
+        }
+
+        return vehicles.stream()
+                .filter(vehicle -> matchesType(vehicle, typeFilter))
+                .collect(Collectors.toList());
+    }
+
+    private WeatherCondition resolveWeatherCondition(double userLat, double userLon) {
+        try {
+            return weatherService.getCurrentWeather(userLat, userLon);
+        } catch (Exception ignored) {
+            // Keep search available even if weather lookup fails.
+            return new WeatherCondition("Unknown", Severity.LOW);
+        }
+    }
+
+    private ContextAwareVehicleResponse vehicleToContextAwareResponse(
+            Vehicle vehicle,
+            WeatherCondition weather
+    ) {
+        LocationDto locationDto = locationToDto(vehicle.getLocation());
+        String locationAddress = null;
+        String locationCity = null;
+
+        Double maxRange = null;
+        String licensePlate = null;
+        Integer seatingCapacity = null;
+
+        String type;
+        if (vehicle instanceof Car car) {
+            type = VehicleType.CAR.name();
+            licensePlate = car.getLicensePlate();
+            seatingCapacity = car.getSeatingCapacity();
+        } else if (vehicle instanceof Scooter scooter) {
+            type = VehicleType.SCOOTER.name();
+            maxRange = scooter.getMaxRange();
+        } else if (vehicle instanceof Bicycle) {
+            type = VehicleType.BICYCLE.name();
+        } else {
+            type = null;
+        }
+
+        boolean weatherRisky = isWeatherRisky(vehicle, weather);
+        String weatherRiskMessage = weatherRisky ? buildVehicleRiskMessage(weather) : null;
+
+        return new ContextAwareVehicleResponse(
+                vehicle.getId(),
+                type,
+                vehicle.getStatus().name(),
+                locationDto,
+                locationAddress,
+                locationCity,
+                vehicle.getProviderId(),
+                vehicle.getCostPerMinute(),
+                maxRange,
+                licensePlate,
+                seatingCapacity,
+                weatherRisky,
+                weatherRiskMessage
+        );
+    }
+
+    private boolean isWeatherRisky(Vehicle vehicle, WeatherCondition weather) {
+        return weather.getSeverity() == Severity.HIGH && !(vehicle instanceof Car);
+    }
+
+    private String buildVehicleRiskMessage(WeatherCondition weather) {
+        return "Risky due to " + weather.getType() + " (" + weather.getSeverity().name() + ") conditions.";
+    }
+
+    private String buildWeatherAdvisory(WeatherCondition weather) {
+        if (weather.getSeverity() == Severity.HIGH) {
+            return "Severe weather detected. You can still reserve any vehicle, but two-wheel vehicles are risky.";
+        }
+        if (weather.getSeverity() == Severity.MEDIUM) {
+            return "Moderate weather conditions. Ride carefully.";
+        }
+        return "Weather conditions are currently favorable.";
+    }
+
+    private LocationDto locationToDto(Location location) {
+        if (location == null) {
+            return null;
+        }
+        return new LocationDto(location.latitude(), location.longitude());
     }
 
     private Vehicle mapToConcreteVehicle(VehicleEntity entity) {
