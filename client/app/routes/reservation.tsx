@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useLocation } from "react-router";
 import { SiteNav } from "../root";
-import { useLocation } from "react-router";
 import { apiFetch } from "../utils/api";
+import { getAuthUser } from "../utils/auth";
 import {
   mapVehiclesToCatalog,
   type VehicleApiResponse,
@@ -13,13 +14,6 @@ interface ReservationState {
   selectedVehicleId?: number;
 }
 
-interface AddressSuggestion {
-  address: string;
-  city: string;
-  latitude: number | null;
-  longitude: number | null;
-}
-
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Reservation | SUMMS" },
@@ -27,8 +21,60 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
+interface TripStartResponse {
+  tripId: number;
+  reservationId: number;
+  vehicleId: number;
+  citizenId: number;
+  startTime: string;
+  endTime: string | null;
+  totalDurationMinutes: number | null;
+  vehicleStatus: string;
+}
+
+interface VehicleOption {
+  id: number;
+  type: string;
+  status: string;
+  providerId: number;
+  costPerMinute: number;
+  location: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+interface ReservationResponse {
+  reservationId: number;
+  userId: number;
+  vehicleId: number;
+  city: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  startLocation: {
+    latitude: number;
+    longitude: number;
+  };
+  endLocation: {
+    latitude: number;
+    longitude: number;
+  };
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleString();
+}
+
 export default function ReservationPage() {
+  const navigate = useNavigate();
   const location = useLocation();
+  const authUser = useMemo(() => getAuthUser(), []);
   const selectedState = (location.state as ReservationState | null) ?? {};
   const [availableVehicles, setAvailableVehicles] = useState<VehicleCatalogItem[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(
@@ -39,9 +85,8 @@ export default function ReservationPage() {
   const [startDate, setStartDate] = useState(toDateTimeInputValue(addHours(new Date(), 1)));
   const [endDate, setEndDate] = useState(toDateTimeInputValue(addHours(new Date(), 2)));
   const [startAddress, setStartAddress] = useState("");
-  const [endAddress, setEndAddress] = useState("");
-  const [citySuggestions, setCitySuggestions] = useState<string[]>([]);
-  const [endAddressSuggestions, setEndAddressSuggestions] = useState<AddressSuggestion[]>([]);
+  const [endLatitude, setEndLatitude] = useState("");
+  const [endLongitude, setEndLongitude] = useState("");
 
   const [isLoadingVehicles, setIsLoadingVehicles] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -123,90 +168,23 @@ export default function ReservationPage() {
   }, []);
 
   useEffect(() => {
-    const query = city.trim();
-    if (query.length < 2) {
-      setCitySuggestions([]);
+    if (!selectedVehicle) {
       return;
     }
 
-    let isCancelled = false;
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const response = await apiFetch(
-          `/api/locations/cities?query=${encodeURIComponent(query)}&limit=6`,
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch city suggestions (${response.status})`);
-        }
-
-        const suggestions = (await response.json()) as string[];
-        if (!isCancelled) {
-          setCitySuggestions(suggestions);
-        }
-      } catch {
-        if (!isCancelled) {
-          setCitySuggestions([]);
-        }
-      }
-    }, 250);
-
-    return () => {
-      isCancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [city]);
-
-  useEffect(() => {
-    const query = endAddress.trim();
-    if (query.length < 3) {
-      setEndAddressSuggestions([]);
-      return;
+    if (
+      endLatitude.trim().length === 0 &&
+      typeof selectedVehicle.latitude === "number"
+    ) {
+      setEndLatitude(selectedVehicle.latitude.toFixed(6));
     }
-
-    const cityQuery = city.trim();
-    let isCancelled = false;
-    const timeoutId = window.setTimeout(async () => {
-      try {
-        const cityPart = cityQuery.length > 0
-          ? `&city=${encodeURIComponent(cityQuery)}`
-          : "";
-        const response = await apiFetch(
-          `/api/locations/suggestions?query=${encodeURIComponent(query)}${cityPart}&limit=6`,
-        );
-        if (!response.ok) {
-          throw new Error(`Failed to fetch address suggestions (${response.status})`);
-        }
-
-        const suggestions = (await response.json()) as AddressSuggestion[];
-        if (!isCancelled) {
-          setEndAddressSuggestions(suggestions);
-        }
-      } catch {
-        if (!isCancelled) {
-          setEndAddressSuggestions([]);
-        }
-      }
-    }, 250);
-
-    return () => {
-      isCancelled = true;
-      window.clearTimeout(timeoutId);
-    };
-  }, [city, endAddress]);
-
-  useEffect(() => {
-    if (city.trim().length > 0) {
-      return;
+    if (
+      endLongitude.trim().length === 0 &&
+      typeof selectedVehicle.longitude === "number"
+    ) {
+      setEndLongitude(selectedVehicle.longitude.toFixed(6));
     }
-
-    const matchingSuggestion = findExactAddressSuggestion(
-      endAddress,
-      endAddressSuggestions,
-    );
-    if (matchingSuggestion && matchingSuggestion.city.trim().length > 0) {
-      setCity(matchingSuggestion.city);
-    }
-  }, [city, endAddress, endAddressSuggestions]);
+  }, [selectedVehicle, endLatitude, endLongitude]);
 
   useEffect(() => {
     if (availableVehicles.length === 0) {
@@ -257,7 +235,7 @@ export default function ReservationPage() {
     },
     {
       label: "To",
-      location: endAddress.trim().length > 0 ? endAddress : "--",
+      location: formatCoordinateLabel(endLatitude, endLongitude),
       dateTime: endDate.trim().length > 0 ? formatDateForDisplay(endDate) : "--",
     },
   ];
@@ -284,8 +262,13 @@ export default function ReservationPage() {
       return;
     }
 
-    if (endAddress.trim().length === 0) {
-      setSubmitError("End address is required.");
+    const parsedLatitude = Number.parseFloat(endLatitude);
+    const parsedLongitude = Number.parseFloat(endLongitude);
+    const coordinatesAreInvalid =
+      !Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude);
+
+    if (coordinatesAreInvalid) {
+      setSubmitError("Destination latitude and longitude are required.");
       return;
     }
 
@@ -302,8 +285,11 @@ export default function ReservationPage() {
       const response = await apiFetch(`/api/vehicles/${selectedVehicleId}/reservations`, {
         method: "POST",
         body: JSON.stringify({
-          endAddress: endAddress.trim(),
           city: city.trim(),
+          endLocation: {
+            latitude: parsedLatitude,
+            longitude: parsedLongitude,
+          },
           startDate: normalizedStart,
           endDate: normalizedEnd,
         }),
@@ -320,7 +306,7 @@ export default function ReservationPage() {
 
       const createdReservation = (await response.json()) as { reservationId: number };
       setSubmitSuccess(
-        `Reservation #${createdReservation.reservationId} was created successfully.`,
+        `Reservation #${createdReservation.reservationId} created. Go to "My Reservations" to start your trip.`,
       );
     } catch {
       setSubmitError("Network error while creating reservation.");
@@ -428,16 +414,12 @@ export default function ReservationPage() {
                   <input
                     id="city"
                     type="text"
-                    list="city-suggestion-list"
                     value={city}
                     onChange={(event) => setCity(event.target.value)}
+                    placeholder="e.g. Montreal"
                     className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none placeholder:text-gray-500"
+                    required
                   />
-                  <datalist id="city-suggestion-list">
-                    {citySuggestions.map((suggestedCity) => (
-                      <option key={suggestedCity} value={suggestedCity} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -468,45 +450,53 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
+                <div>
+                  <label htmlFor="start-address" className="mb-1.5 block text-sm uppercase text-gray-300">
+                    Start Address
+                  </label>
+                  <input
+                    id="start-address"
+                    type="text"
+                    value={startAddress}
+                    readOnly
+                    className="w-full cursor-not-allowed rounded-xl border border-[#50617c] bg-[#0f1c33] px-3 py-2.5 text-base text-gray-200 outline-none"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Fixed to selected vehicle location.
+                  </p>
+                </div>
+
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="start-address" className="mb-1.5 block text-sm uppercase text-gray-300">
-                      Start Address
+                    <label htmlFor="end-latitude" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Latitude
                     </label>
                     <input
-                      id="start-address"
-                      type="text"
-                      value={startAddress}
-                      readOnly
-                      className="w-full cursor-not-allowed rounded-xl border border-[#50617c] bg-[#0f1c33] px-3 py-2.5 text-base text-gray-200 outline-none"
+                      id="end-latitude"
+                      type="number"
+                      step="0.000001"
+                      value={endLatitude}
+                      onChange={(event) => setEndLatitude(event.target.value)}
+                      placeholder="e.g. 45.501700"
+                      className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                      required
                     />
-                    <p className="mt-1 text-xs text-gray-400">
-                      Fixed to selected vehicle location.
-                    </p>
                   </div>
 
                   <div>
-                    <label htmlFor="end-address" className="mb-1.5 block text-sm uppercase text-gray-300">
-                      End Address
+                    <label htmlFor="end-longitude" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Longitude
                     </label>
                     <input
-                      id="end-address"
-                      type="text"
-                      list="end-address-suggestion-list"
-                      value={endAddress}
-                      onChange={(event) => setEndAddress(event.target.value)}
-                      placeholder="e.g. 800 Rue du Square-Victoria"
+                      id="end-longitude"
+                      type="number"
+                      step="0.000001"
+                      value={endLongitude}
+                      onChange={(event) => setEndLongitude(event.target.value)}
+                      placeholder="e.g. -73.567300"
                       className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                      required
                     />
-                    <datalist id="end-address-suggestion-list">
-                      {endAddressSuggestions.map((suggestion) => (
-                        <option
-                          key={`${suggestion.address}-${suggestion.latitude}-${suggestion.longitude}`}
-                          value={suggestion.address}
-                          label={suggestion.city}
-                        />
-                      ))}
-                    </datalist>
                   </div>
                 </div>
 
@@ -534,22 +524,6 @@ export default function ReservationPage() {
   );
 }
 
-function findExactAddressSuggestion(
-  value: string,
-  suggestions: AddressSuggestion[],
-): AddressSuggestion | null {
-  const normalizedValue = value.trim().toLowerCase();
-  if (normalizedValue.length === 0) {
-    return null;
-  }
-
-  return (
-    suggestions.find(
-      (suggestion) => suggestion.address.trim().toLowerCase() === normalizedValue,
-    ) ?? null
-  );
-}
-
 function addHours(date: Date, hours: number): Date {
   return new Date(date.getTime() + hours * 60 * 60 * 1000);
 }
@@ -570,6 +544,16 @@ function formatDateForDisplay(value: string): string {
   }
 
   return parsedDate.toLocaleString();
+}
+
+function formatCoordinateLabel(latitude: string, longitude: string): string {
+  const parsedLatitude = Number.parseFloat(latitude);
+  const parsedLongitude = Number.parseFloat(longitude);
+  if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)) {
+    return "--";
+  }
+
+  return `${parsedLatitude.toFixed(6)}, ${parsedLongitude.toFixed(6)}`;
 }
 
 async function readErrorMessage(

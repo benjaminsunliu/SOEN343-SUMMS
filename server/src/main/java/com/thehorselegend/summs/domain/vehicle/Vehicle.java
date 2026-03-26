@@ -39,6 +39,13 @@ public abstract class Vehicle {
         this.status = VehicleStatus.RESERVED;
     }
 
+    public void startTrip() {
+        if (status != VehicleStatus.RESERVED) {
+            throw new IllegalStateException("Vehicle must be reserved before a trip starts");
+        }
+        this.status = VehicleStatus.IN_USE;
+    }
+
     public void makeAvailable() {
         this.status = VehicleStatus.AVAILABLE;
     }

@@ -2,11 +2,20 @@ package com.thehorselegend.summs.infrastructure.persistence;
 
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reservations")
+@Table(
+        name = "reservations",
+        indexes = {
+                @Index(name = "idx_reservations_user_id", columnList = "user_id"),
+                @Index(name = "idx_reservations_reservable_id", columnList = "reservable_id"),
+                @Index(name = "idx_reservations_status_end_date", columnList = "status,end_date")
+        }
+)
 public class ReservationEntity {
 
     @Id
@@ -14,22 +23,23 @@ public class ReservationEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(nullable = false)
+    @Column(name = "reservable_id", nullable = false)
     private Long reservableId;
 
-    @Column(nullable = false)
+    @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
 
-    @Column(nullable = false)
+    @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
     @Column(nullable = false, length = 100)
     private String city;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(nullable = false, length = 20)
     private ReservationStatus status;
 

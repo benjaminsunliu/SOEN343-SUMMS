@@ -2,6 +2,7 @@ import { SiteNav } from "../root";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { apiFetch } from "../utils/api";
+import { getAuthUser } from "../utils/auth";
 import type { Route } from "./+types/dashboard";
 import { getBrowserLocation, type GeoLocation } from "../utils/location";
 import { MapView, type MapMarker } from "../components/MapView";
@@ -18,9 +19,15 @@ interface VehicleResponse {
 
 interface ReservationSummary {
   reservationId: number;
+  userId: number;
   vehicleId: number;
   city: string;
   status: string;
+}
+
+interface ActiveTripSummary {
+  tripId: number;
+  vehicleId: number;
 }
 
 // Default map center for dashboard when user location is not yet available
@@ -38,9 +45,11 @@ export function meta({}: Route.MetaArgs) {
 
 export default function DashboardPage() {
   const navigate = useNavigate();
+  const authUser = useMemo(() => getAuthUser(), []);
   const [availableVehicles, setAvailableVehicles] = useState<VehicleResponse[]>([]);
   const [activeReservations, setActiveReservations] = useState<number | null>(null);
   const [reservations, setReservations] = useState<ReservationSummary[]>([]);
+  const [activeTrip, setActiveTrip] = useState<ActiveTripSummary | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -100,24 +109,41 @@ export default function DashboardPage() {
 
     async function loadReservations() {
       try {
-        const response = await apiFetch("/api/reservations");
-        if (!response.ok) {
+        const [reservationsResponse, activeTripResponse] = await Promise.all([
+          apiFetch("/api/reservations"),
+          authUser ? apiFetch(`/api/trips/active/${authUser.id}`) : Promise.resolve(null),
+        ]);
+
+        if (!reservationsResponse.ok) {
           throw new Error("Failed to load reservations");
         }
 
-        const reservations = (await response.json()) as ReservationSummary[];
+        const reservations = (await reservationsResponse.json()) as ReservationSummary[];
         if (!isMounted) {
           return;
         }
 
-        const activeCount = reservations.filter(
-          (reservation) => reservation.status.toUpperCase() !== "CANCELLED",
-        ).length;
-        setReservations(reservations);
-        setActiveReservations(activeCount);
+        const userReservations = authUser
+          ? reservations.filter((reservation) => reservation.userId === authUser.id)
+          : [];
+        const confirmedBookings = userReservations.filter(
+          (reservation) => reservation.status.toUpperCase() === "CONFIRMED",
+        );
+
+        if (activeTripResponse && activeTripResponse.ok) {
+          const trip = (await activeTripResponse.json()) as { tripId: number; vehicleId: number };
+          setActiveTrip({ tripId: trip.tripId, vehicleId: trip.vehicleId });
+          setActiveReservations(1);
+        } else {
+          setActiveTrip(null);
+          setActiveReservations(0);
+        }
+
+        setReservations(confirmedBookings);
       } catch {
         if (isMounted) {
           setReservations([]);
+          setActiveTrip(null);
           setActiveReservations(null);
         }
       } finally {
@@ -132,15 +158,7 @@ export default function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
-
-  const activeBookingItems = useMemo(
-    () =>
-      reservations.filter(
-        (reservation) => reservation.status.toUpperCase() !== "CANCELLED",
-      ),
-    [reservations],
-  );
+  }, [authUser]);
 
   useEffect(() => {
     // Get browser location
@@ -215,7 +233,7 @@ export default function DashboardPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authUser]);
 
   const mapMarkers: MapMarker[] = useMemo(() => {
     const vehicleMarkers = availableVehicles
@@ -416,24 +434,32 @@ export default function DashboardPage() {
                   <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2 text-sm text-gray-300">
                     Loading active bookings...
                   </div>
-                ) : activeBookingItems.length === 0 ? (
+                ) : reservations.length === 0 && !activeTrip ? (
                   <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2 text-sm text-gray-300">
                     No active bookings.
                   </div>
                 ) : (
-                  activeBookingItems.map((reservation) => (
-                    <div
-                      key={reservation.reservationId}
-                      className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2"
-                    >
-                      <p className="text-lg font-semibold">
-                        Reservation #{reservation.reservationId}
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        Vehicle #{reservation.vehicleId} - {reservation.city}
-                      </p>
-                    </div>
-                  ))
+                  <>
+                    {activeTrip && (
+                      <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2">
+                        <p className="text-lg font-semibold">Active Trip #{activeTrip.tripId}</p>
+                        <p className="text-sm text-gray-300">Vehicle #{activeTrip.vehicleId} - In progress</p>
+                      </div>
+                    )}
+                    {reservations.map((reservation) => (
+                      <div
+                        key={reservation.reservationId}
+                        className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2"
+                      >
+                        <p className="text-lg font-semibold">
+                          Reservation #{reservation.reservationId}
+                        </p>
+                        <p className="text-sm text-gray-300">
+                          Vehicle #{reservation.vehicleId} - {reservation.city}
+                        </p>
+                      </div>
+                    ))}
+                  </>
                 )}
               </div>
             </article>
