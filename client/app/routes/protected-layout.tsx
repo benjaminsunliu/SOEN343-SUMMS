@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { hasAnyRole, type AuthRole, isAuthenticated } from "../utils/auth";
+import { SiteNav } from "../root";
 
 interface RouteRoleRule {
   pattern: RegExp;
@@ -44,5 +45,12 @@ export default function ProtectedLayout() {
     return null;
   }
 
-  return <Outlet />;
+  return (
+    <div className="bg-gray-900 min-h-screen">
+      <SiteNav />
+      <main className="ml-56 min-h-screen overflow-y-auto">
+        <Outlet />
+      </main>
+    </div>
+  );
 }

@@ -15,7 +15,7 @@ export default function GatewayAnalyticsPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 p-4 bg-gray-900 min-h-screen">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <h1 className="text-2xl font-semibold mb-2 text-white">Gateway Analytics</h1>
         <p className="text-gray-400">
           Gateway/service-level analytics for the mobility platform.

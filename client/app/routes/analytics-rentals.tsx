@@ -101,7 +101,7 @@ export default function RentalAnalyticsPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 bg-gray-900 min-h-screen">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <header className="mb-6">
             <h1 className="text-3xl font-bold text-white">Rental Analytics</h1>

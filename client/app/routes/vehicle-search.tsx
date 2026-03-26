@@ -323,7 +323,7 @@ export default function VehicleSearchPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <header className="mb-4 border-b border-[#253047] pb-3">
           <h1 className="text-2xl font-bold tracking-tight">Find a Vehicle</h1>
         </header>
@@ -333,7 +333,7 @@ export default function VehicleSearchPage() {
           </div>
         )}
         {locationError && (
-          <div className="mb-3 rounded-xl border border-blue-500/70 bg-blue-500/20 px-4 py-2 text-sm text-blue-200">
+          <div className="mb-3 rounded-xl border border-blue-500/70 bg-gray-900lue-500/20 px-4 py-2 text-sm text-blue-200">
             {locationError}
           </div>
         )}
@@ -441,13 +441,13 @@ export default function VehicleSearchPage() {
                     onClick={() =>
                       setMapCenter([userLocation.latitude, userLocation.longitude])
                     }
-                    className="absolute right-3 top-3 z-[500] rounded-md border border-cyan-300 bg-black/80 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-black"
+                    className="absolute right-3 top-3 z-[500] rounded-md border border-cyan-300 bg-gray-900/80 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-gray-900"
                   >
                     My Location
                   </button>
                 )}
                 {isLoadingVehicles && (
-                  <p className="pointer-events-none absolute inset-0 grid place-items-center rounded-lg bg-black/40 text-sm text-gray-200">
+                  <p className="pointer-events-none absolute inset-0 grid place-items-center rounded-lg bg-gray-900/40 text-sm text-gray-200">
                     Loading live vehicles...
                   </p>
                 )}

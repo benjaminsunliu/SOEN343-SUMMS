@@ -1,7 +1,11 @@
 import { SiteNav } from "../root";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
-import { apiFetch } from "../utils/api";
+import {
+  apiFetch,
+  listParkingReservations,
+  type ParkingReservationResponse,
+} from "../utils/api";
 import { getAuthUser } from "../utils/auth";
 import type { Route } from "./+types/dashboard";
 import { getBrowserLocation, type GeoLocation } from "../utils/location";
@@ -19,10 +23,20 @@ interface VehicleResponse {
 
 interface ReservationSummary {
   reservationId: number;
-  userId: number;
   vehicleId: number;
   city: string;
   status: string;
+  startDate: string;
+}
+
+type ReservationType = "VEHICLE" | "PARKING";
+
+interface BookingSummary {
+  reservationId: number;
+  reservationType: ReservationType;
+  title: string;
+  subtitle: string;
+  sortTimestamp: number;
 }
 
 interface ActiveTripSummary {
@@ -48,7 +62,7 @@ export default function DashboardPage() {
   const authUser = useMemo(() => getAuthUser(), []);
   const [availableVehicles, setAvailableVehicles] = useState<VehicleResponse[]>([]);
   const [activeReservations, setActiveReservations] = useState<number | null>(null);
-  const [reservations, setReservations] = useState<ReservationSummary[]>([]);
+  const [reservations, setReservations] = useState<BookingSummary[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTripSummary | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(true);
@@ -109,8 +123,9 @@ export default function DashboardPage() {
 
     async function loadReservations() {
       try {
-        const [reservationsResponse, activeTripResponse] = await Promise.all([
+        const [reservationsResponse, parkingReservations, activeTripResponse] = await Promise.all([
           apiFetch("/api/reservations"),
+          listParkingReservations().catch(() => []),
           authUser ? apiFetch(`/api/trips/active/${authUser.id}`) : Promise.resolve(null),
         ]);
 
@@ -118,28 +133,54 @@ export default function DashboardPage() {
           throw new Error("Failed to load reservations");
         }
 
-        const reservations = (await reservationsResponse.json()) as ReservationSummary[];
+        const vehicleReservations = (await reservationsResponse.json()) as ReservationSummary[];
         if (!isMounted) {
           return;
         }
 
-        const userReservations = authUser
-          ? reservations.filter((reservation) => reservation.userId === authUser.id)
-          : [];
-        const confirmedBookings = userReservations.filter(
-          (reservation) => reservation.status.toUpperCase() === "CONFIRMED",
-        );
+        const confirmedVehicleBookings: BookingSummary[] = vehicleReservations
+          .filter((reservation) => reservation.status.toUpperCase() === "CONFIRMED")
+          .map((reservation) => ({
+            reservationId: reservation.reservationId,
+            reservationType: "VEHICLE",
+            title: `Reservation #${reservation.reservationId}`,
+            subtitle: `Vehicle #${reservation.vehicleId} - ${reservation.city}`,
+            sortTimestamp: Date.parse(reservation.startDate),
+          }));
+
+        const confirmedParkingBookings: BookingSummary[] = parkingReservations
+          .filter((reservation) => reservation.status.toUpperCase() === "CONFIRMED")
+          .map((reservation) => ({
+            reservationId: reservation.reservationId,
+            reservationType: "PARKING",
+            title: `Parking Reservation #${reservation.reservationId}`,
+            subtitle: `${reservation.facilityName} - ${reservation.city}`,
+            sortTimestamp: parkingReservationSortTimestamp(reservation),
+          }));
+
+        const activeBookings = [...confirmedVehicleBookings, ...confirmedParkingBookings]
+          .map((booking) => ({
+            ...booking,
+            sortTimestamp: Number.isFinite(booking.sortTimestamp)
+              ? booking.sortTimestamp
+              : booking.reservationId,
+          }))
+          .sort((a, b) => b.sortTimestamp - a.sortTimestamp);
+
+        let hasActiveTrip = false;
 
         if (activeTripResponse && activeTripResponse.ok) {
           const trip = (await activeTripResponse.json()) as { tripId: number; vehicleId: number };
           setActiveTrip({ tripId: trip.tripId, vehicleId: trip.vehicleId });
-          setActiveReservations(1);
+          hasActiveTrip = true;
         } else {
           setActiveTrip(null);
-          setActiveReservations(0);
         }
 
-        setReservations(confirmedBookings);
+        setActiveReservations(
+          activeBookings.length + (hasActiveTrip ? 1 : 0),
+        );
+        setReservations(activeBookings);
       } catch {
         if (isMounted) {
           setReservations([]);
@@ -308,7 +349,7 @@ export default function DashboardPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <header className="mb-3 border-b border-[#253047] pb-2.5">
           <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
         </header>
@@ -448,15 +489,11 @@ export default function DashboardPage() {
                     )}
                     {reservations.map((reservation) => (
                       <div
-                        key={reservation.reservationId}
+                        key={`${reservation.reservationType}:${reservation.reservationId}`}
                         className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2"
                       >
-                        <p className="text-lg font-semibold">
-                          Reservation #{reservation.reservationId}
-                        </p>
-                        <p className="text-sm text-gray-300">
-                          Vehicle #{reservation.vehicleId} - {reservation.city}
-                        </p>
+                        <p className="text-lg font-semibold">{reservation.title}</p>
+                        <p className="text-sm text-gray-300">{reservation.subtitle}</p>
                       </div>
                     ))}
                   </>
@@ -468,6 +505,14 @@ export default function DashboardPage() {
       </main>
     </>
   );
+}
+
+function parkingReservationSortTimestamp(reservation: ParkingReservationResponse): number {
+  const timestamp = Date.parse(`${reservation.arrivalDate}T${reservation.arrivalTime}`);
+  if (Number.isFinite(timestamp)) {
+    return timestamp;
+  }
+  return reservation.reservationId;
 }
 
 function buildWeatherDescription(weatherCode: number | undefined): string | null {
