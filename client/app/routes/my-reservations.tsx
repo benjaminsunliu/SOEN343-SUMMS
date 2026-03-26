@@ -493,14 +493,37 @@ function reservationSortTimestamp(reservation: ReservationCard): number {
     if (Number.isFinite(timestamp)) {
       return timestamp;
     }
+
+    const fallbackTimestamp = Date.parse(reservation.endDate);
+    if (Number.isFinite(fallbackTimestamp)) {
+      return fallbackTimestamp;
+    }
+
     return reservation.reservationId;
+  }
+
+  const parkingConfirmedTimestamp = parseParkingConfirmedAt(reservation.confirmedAt);
+  if (Number.isFinite(parkingConfirmedTimestamp)) {
+    return parkingConfirmedTimestamp;
   }
 
   const parkingTimestamp = Date.parse(`${reservation.arrivalDate}T${reservation.arrivalTime}`);
   if (Number.isFinite(parkingTimestamp)) {
     return parkingTimestamp;
   }
+
   return reservation.reservationId;
+}
+
+function parseParkingConfirmedAt(confirmedAt: string): number {
+  if (!confirmedAt) {
+    return Number.NaN;
+  }
+
+  const isoLikeValue = confirmedAt.includes("T")
+    ? confirmedAt
+    : confirmedAt.replace(" ", "T");
+  return Date.parse(isoLikeValue);
 }
 
 function isVehicleReservation(
