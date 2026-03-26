@@ -16,6 +16,7 @@ export default [
 		route("provider/vehicles", "routes/provider-vehicles.tsx"),
 		route("provider/operations", "routes/provider-operations.tsx"),
 		route("services/parking", "routes/parking.tsx"),
+		route("services/parking/confirm", "routes/parking-confirmation.tsx"),
 		route("services/public-transport", "routes/public-transport.tsx"),
 		route("analytics/rentals", "routes/analytics-rentals.tsx"),
 		route("analytics/gateway", "routes/analytics-gateway.tsx"),

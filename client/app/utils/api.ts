@@ -41,3 +41,129 @@ export function authHeaders(extraHeaders?: HeadersInit): HeadersInit {
 
   return headers;
 }
+
+export interface ParkingSearchParams {
+  destination: string;
+  city: string;
+  arrivalDate: string;
+  arrivalTime: string;
+  durationHours: number;
+  vehicleType: string;
+  maxPricePerHour: number;
+}
+
+export interface ParkingFacility {
+  facilityId: number;
+  name: string;
+  address: string;
+  city: string;
+  distanceKm: number;
+  pricePerHour: number;
+  estimatedTotal: number;
+  rating: number;
+  availableSpots: number;
+  totalSpots: number;
+  availabilityStatus: "AVAILABLE" | "ALMOST_FULL" | "FULL";
+  covered: boolean;
+  openTwentyFourHours: boolean;
+  evCharging: boolean;
+  security: boolean;
+  amenityTags: string[];
+}
+
+//Parking API Calls
+
+const API_BASE = "http://localhost:8080/api";
+
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem("token");
+  return token
+    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+    : { "Content-Type": "application/json" };
+}
+
+export async function searchParking(
+  params: ParkingSearchParams
+): Promise<ParkingFacility[]> {
+  const query = new URLSearchParams({
+    destination:      params.destination,
+    city:             params.city,
+    arrivalDate:      params.arrivalDate,
+    arrivalTime:      params.arrivalTime,
+    durationHours:    String(params.durationHours),
+    vehicleType:      params.vehicleType,
+    maxPricePerHour:  String(params.maxPricePerHour),
+  });
+
+  const res = await apiFetch(`/api/parking/search?${query}`);
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Parking service unavailable");
+  }
+
+  return res.json();
+}
+
+export interface CreateParkingReservationRequest {
+  facilityId:      number;
+  facilityName:    string;
+  facilityAddress: string;
+  city:            string;
+  arrivalDate:     string;
+  arrivalTime:     string;
+  durationHours:   number;
+  totalCost:       number;
+  paymentMethod:   string;
+}
+
+export interface ParkingReservationResponse {
+  reservationId:  number;
+  facilityName:   string;
+  facilityAddress:string;
+  city:           string;
+  arrivalDate:    string;
+  arrivalTime:    string;
+  durationHours:  number;
+  totalCost:      number;
+  status:         string;
+  confirmedAt:    string;
+}
+
+export async function createParkingReservation(
+  data: CreateParkingReservationRequest
+): Promise<ParkingReservationResponse> {
+  const res = await apiFetch("/api/parking/reservations", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Failed to create reservation");
+  }
+
+  return res.json();
+}
+
+export async function listParkingReservations(): Promise<ParkingReservationResponse[]> {
+  const res = await apiFetch("/api/parking/reservations");
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load parking reservations");
+  }
+
+  return res.json();
+}
+
+export async function cancelParkingReservation(reservationId: number): Promise<void> {
+  const res = await apiFetch(`/api/parking/reservations/${reservationId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Could not cancel parking reservation");
+  }
+}
