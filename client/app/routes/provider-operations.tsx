@@ -112,7 +112,7 @@ export default function ProviderOperationsPage() {
   const activeRentals = vehicles.filter(v => v.status.toUpperCase() === "IN_USE");
   const statusBreakdown = [
     { label: "Available", value: stats.available, color: "bg-green-500" },
-    { label: "In Use", value: stats.inUse, color: "bg-blue-500" },
+    { label: "In Use", value: stats.inUse, color: "bg-gray-900lue-500" },
     { label: "Reserved", value: stats.reserved, color: "bg-yellow-500" },
     { label: "Unavailable", value: stats.unavailable, color: "bg-gray-500" },
   ];
@@ -129,7 +129,7 @@ export default function ProviderOperationsPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 bg-gray-900 min-h-screen">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Header */}
           <div className="flex justify-between items-start mb-8">
@@ -416,7 +416,7 @@ function StatusBadge({ status }: StatusBadgeProps) {
       case "AVAILABLE":
         return "bg-green-100 text-green-800 border border-green-300";
       case "IN_USE":
-        return "bg-blue-100 text-blue-800 border border-blue-300";
+        return "bg-gray-900lue-100 text-blue-800 border border-blue-300";
       case "RESERVED":
         return "bg-yellow-100 text-yellow-800 border border-yellow-300";
       case "UNAVAILABLE":

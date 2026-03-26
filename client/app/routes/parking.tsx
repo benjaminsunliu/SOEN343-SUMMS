@@ -61,7 +61,7 @@ export default function ParkingPage() {
     useParkingSearch();
 
   return (
-    <div className="ml-56 flex flex-col h-screen bg-gray-900">
+    <div className="min-h-screen bg-gray-900 px-5 py-4 text-white">
       <div className="px-7 py-5 border-b border-gray-800">
         <h1 className="text-xl font-bold text-white">Parking Finder</h1>
       </div>
