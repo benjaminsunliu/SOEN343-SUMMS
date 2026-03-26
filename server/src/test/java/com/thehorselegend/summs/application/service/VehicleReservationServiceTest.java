@@ -1,7 +1,6 @@
 package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
-import com.thehorselegend.summs.application.service.reservation.AddressGeocodingService;
 import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
@@ -39,9 +38,6 @@ class VehicleReservationServiceTest {
 
     @Mock
     private ReservationRepository reservationRepository;
-
-    @Mock
-    private AddressGeocodingService geocodingService;
 
     @InjectMocks
     private VehicleReservationService reservationService;
@@ -132,11 +128,10 @@ class VehicleReservationServiceTest {
         );
 
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(VehicleMapper.toEntity(reservedVehicle)));
+        when(vehicleRepository.findAllById(any())).thenReturn(List.of(VehicleMapper.toEntity(reservedVehicle)));
         when(reservationRepository.findByUserId(userId))
                 .thenReturn(List.of(ReservationMapper.toEntity(pastConfirmedReservation)));
-        when(reservationRepository.save(any(ReservationEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(vehicleRepository.save(any(VehicleEntity.class)))
+        when(vehicleRepository.saveAll(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         List<Reservation> reservations = reservationService.getUserReservations(userId);
@@ -144,8 +139,9 @@ class VehicleReservationServiceTest {
         assertEquals(1, reservations.size());
         assertEquals(ReservationStatus.EXPIRED, reservations.get(0).getStatus());
 
-        ArgumentCaptor<VehicleEntity> vehicleCaptor = ArgumentCaptor.forClass(VehicleEntity.class);
-        verify(vehicleRepository).save(vehicleCaptor.capture());
-        assertEquals(VehicleStatus.AVAILABLE, vehicleCaptor.getValue().getStatus());
+        ArgumentCaptor<List<VehicleEntity>> vehiclesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(vehicleRepository).saveAll(vehiclesCaptor.capture());
+        assertEquals(1, vehiclesCaptor.getValue().size());
+        assertEquals(VehicleStatus.AVAILABLE, vehiclesCaptor.getValue().get(0).getStatus());
     }
 }

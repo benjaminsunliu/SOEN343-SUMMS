@@ -7,7 +7,9 @@ import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
+import com.thehorselegend.summs.infrastructure.persistence.ReservationEntity;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
+import com.thehorselegend.summs.infrastructure.persistence.VehicleEntity;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleMapper;
 import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
 import com.thehorselegend.summs.shared.time.SummsTime;
@@ -15,7 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,14 +28,11 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
 
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
-    private final AddressGeocodingService geocodingService;
 
     public VehicleReservationService(VehicleRepository vehicleRepository,
-                                     ReservationRepository reservationRepository,
-                                     AddressGeocodingService geocodingService) {
+                                     ReservationRepository reservationRepository) {
         this.vehicleRepository = vehicleRepository;
         this.reservationRepository = reservationRepository;
-        this.geocodingService = geocodingService;
     }
 
     @Override
@@ -84,7 +86,7 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
             Long userId,
             Long vehicleId,
             String city,
-            String endAddress,
+            Location endLocation,
             LocalDateTime startDate,
             LocalDateTime endDate
     ) {
@@ -95,7 +97,6 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
         validateAvailability(vehicle, startDate, endDate);
 
         Location startLocation = vehicle.getLocation();
-        Location endLocation = geocodingService.geocode(endAddress, city);
 
         VehicleReservation reservation = new VehicleReservation(
                 userId,
@@ -138,9 +139,20 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
     @Transactional
     public List<Reservation> getUserReservations(Long userId) {
         LocalDateTime now = SummsTime.now();
-        return reservationRepository.findByUserId(userId).stream()
+        List<ReservationEntity> reservationEntities = reservationRepository.findByUserId(userId);
+        Set<Long> reservableIdsToRelease = new LinkedHashSet<>();
+
+        for (ReservationEntity reservationEntity : reservationEntities) {
+            if (shouldExpire(reservationEntity.getStatus(), reservationEntity.getEndDate(), now)) {
+                reservationEntity.setStatus(ReservationStatus.EXPIRED);
+                reservableIdsToRelease.add(reservationEntity.getReservableId());
+            }
+        }
+
+        releaseReservedVehicles(reservableIdsToRelease);
+
+        return reservationEntities.stream()
                 .map(ReservationMapper::toDomain)
-                .map(reservation -> expireReservationIfNeeded(reservation, now))
                 .collect(Collectors.toList());
     }
 
@@ -161,9 +173,7 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
     }
 
     private Reservation expireReservationIfNeeded(Reservation reservation, LocalDateTime now) {
-        ReservationStatus status = reservation.getStatus();
-        boolean isExpirable = status == ReservationStatus.PENDING || status == ReservationStatus.CONFIRMED;
-        if (!isExpirable || reservation.getEndDate().isAfter(now)) {
+        if (!shouldExpire(reservation.getStatus(), reservation.getEndDate(), now)) {
             return reservation;
         }
 
@@ -172,15 +182,33 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
                 reservationRepository.save(ReservationMapper.toEntity(reservation))
         );
 
-        vehicleRepository.findById(reservation.getReservableId())
-                .map(VehicleMapper::toDomain)
-                .ifPresent(vehicle -> {
-                    if (vehicle.getStatus() == VehicleStatus.RESERVED) {
-                        vehicle.makeAvailable();
-                        vehicleRepository.save(VehicleMapper.toEntity(vehicle));
-                    }
-                });
+        releaseReservedVehicles(Set.of(reservation.getReservableId()));
 
         return expiredReservation;
+    }
+
+    private void releaseReservedVehicles(Set<Long> reservableIds) {
+        if (reservableIds.isEmpty()) {
+            return;
+        }
+
+        List<VehicleEntity> vehicles = vehicleRepository.findAllById(reservableIds);
+        List<VehicleEntity> vehiclesToUpdate = new ArrayList<>();
+
+        for (VehicleEntity vehicleEntity : vehicles) {
+            if (vehicleEntity.getStatus() == VehicleStatus.RESERVED) {
+                vehicleEntity.setStatus(VehicleStatus.AVAILABLE);
+                vehiclesToUpdate.add(vehicleEntity);
+            }
+        }
+
+        if (!vehiclesToUpdate.isEmpty()) {
+            vehicleRepository.saveAll(vehiclesToUpdate);
+        }
+    }
+
+    private boolean shouldExpire(ReservationStatus status, LocalDateTime endDate, LocalDateTime now) {
+        boolean isExpirable = status == ReservationStatus.PENDING || status == ReservationStatus.CONFIRMED;
+        return isExpirable && !endDate.isAfter(now);
     }
 }

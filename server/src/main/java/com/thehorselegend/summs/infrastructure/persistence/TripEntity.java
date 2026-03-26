@@ -5,26 +5,33 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "trips")
+@Table(
+        name = "trips",
+        indexes = {
+                @Index(name = "idx_trips_reservation_id", columnList = "reservation_id"),
+                @Index(name = "idx_trips_citizen_end_time", columnList = "citizen_id,end_time"),
+                @Index(name = "idx_trips_vehicle_end_time", columnList = "vehicle_id,end_time")
+        }
+)
 public class TripEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "reservation_id", nullable = false)
     private Long reservationId;
 
-    @Column(nullable = false)
+    @Column(name = "vehicle_id", nullable = false)
     private Long vehicleId;
 
-    @Column(nullable = false)
+    @Column(name = "citizen_id", nullable = false)
     private Long citizenId;
 
-    @Column(nullable = false)
+    @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
 
-    @Column
+    @Column(name = "end_time")
     private LocalDateTime endTime;
 
     @Column

@@ -8,7 +8,14 @@ import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "reservations")
+@Table(
+        name = "reservations",
+        indexes = {
+                @Index(name = "idx_reservations_user_id", columnList = "user_id"),
+                @Index(name = "idx_reservations_reservable_id", columnList = "reservable_id"),
+                @Index(name = "idx_reservations_status_end_date", columnList = "status,end_date")
+        }
+)
 public class ReservationEntity {
 
     @Id
@@ -16,16 +23,16 @@ public class ReservationEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(nullable = false)
+    @Column(name = "reservable_id", nullable = false)
     private Long reservableId;
 
-    @Column(nullable = false)
+    @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
 
-    @Column(nullable = false)
+    @Column(name = "end_date", nullable = false)
     private LocalDateTime endDate;
 
     @Column(nullable = false, length = 100)

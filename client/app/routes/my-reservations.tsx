@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { SiteNav } from "../root";
 import { apiFetch } from "../utils/api";
@@ -31,13 +31,6 @@ interface ReservationTripDetails {
   vehicleStatus: string;
 }
 
-interface ReverseGeocodeResponse {
-  address: string;
-  city: string;
-  latitude: number | null;
-  longitude: number | null;
-}
-
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "My Reservations | SUMMS" },
@@ -51,8 +44,6 @@ export default function MyReservationsPage() {
   const [tripDetailsByReservationId, setTripDetailsByReservationId] = useState<
     Record<number, ReservationTripDetails>
   >({});
-  const [locationLabelsByKey, setLocationLabelsByKey] = useState<Record<string, string>>({});
-  const locationLabelsRef = useRef<Record<string, string>>({});
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [cancelingReservationIds, setCancelingReservationIds] = useState<number[]>([]);
   const [startingReservationIds, setStartingReservationIds] = useState<number[]>([]);
@@ -89,6 +80,8 @@ export default function MyReservationsPage() {
           (a, b) => b.reservationId - a.reservationId,
         );
         setReservations(sortedReservations);
+        setReservationError(null);
+        setIsLoadingReservations(false);
 
         const completedReservations = sortedReservations.filter(
           (reservation) => reservation.status.toUpperCase() === "COMPLETED",
@@ -129,60 +122,6 @@ export default function MyReservationsPage() {
           });
           setTripDetailsByReservationId(mappedTripEntries);
         }
-
-        const uniqueLocationsByKey = new Map<string, ReservationLocation>();
-        sortedReservations.forEach((reservation) => {
-          const startKey = toLocationKey(reservation.startLocation);
-          const endKey = toLocationKey(reservation.endLocation);
-          if (!uniqueLocationsByKey.has(startKey)) {
-            uniqueLocationsByKey.set(startKey, reservation.startLocation);
-          }
-          if (!uniqueLocationsByKey.has(endKey)) {
-            uniqueLocationsByKey.set(endKey, reservation.endLocation);
-          }
-        });
-
-        const locationsNeedingLookup = [...uniqueLocationsByKey.entries()].filter(
-          ([locationKey]) => !locationLabelsRef.current[locationKey],
-        );
-
-        if (locationsNeedingLookup.length > 0) {
-          const resolvedLocations = await Promise.all(
-            locationsNeedingLookup.map(async ([locationKey, location]) => {
-              try {
-                const reverseGeocodeResponse = await apiFetch(
-                  `/api/locations/reverse?latitude=${location.latitude}&longitude=${location.longitude}`,
-                );
-                if (!reverseGeocodeResponse.ok) {
-                  return [locationKey, null] as const;
-                }
-
-                const reverseGeocodeResult =
-                  (await reverseGeocodeResponse.json()) as ReverseGeocodeResponse;
-                return [locationKey, formatAddressLabel(reverseGeocodeResult)] as const;
-              } catch {
-                return [locationKey, null] as const;
-              }
-            }),
-          );
-
-          if (!isMounted) {
-            return;
-          }
-
-          const mergedLabels = { ...locationLabelsRef.current };
-          resolvedLocations.forEach(([locationKey, addressLabel]) => {
-            if (addressLabel) {
-              mergedLabels[locationKey] = addressLabel;
-            }
-          });
-          locationLabelsRef.current = mergedLabels;
-          setLocationLabelsByKey(mergedLabels);
-        } else {
-          setLocationLabelsByKey(locationLabelsRef.current);
-        }
-
-        setReservationError(null);
       } catch (error) {
         if (isMounted) {
           setReservationError(
@@ -354,10 +293,10 @@ export default function MyReservationsPage() {
                           Vehicle #{reservation.vehicleId} - {reservation.city}
                         </p>
                         <p className="text-xs text-gray-400">
-                          From: {getLocationDisplayLabel(reservation.startLocation, locationLabelsByKey)}
+                          From: {getLocationDisplayLabel(reservation.startLocation)}
                         </p>
                         <p className="text-xs text-gray-400">
-                          To: {getLocationDisplayLabel(reservation.endLocation, locationLabelsByKey)}
+                          To: {getLocationDisplayLabel(reservation.endLocation)}
                         </p>
                         {isCompleted && (
                           <div className="mt-2 rounded-lg border border-[#2d3d57] bg-[#101d34] px-3 py-2 text-xs text-gray-300">
@@ -465,38 +404,12 @@ function formatDateTime(dateTime: string | null): string {
   return parsed.toLocaleString();
 }
 
-function toLocationKey(location: ReservationLocation): string {
-  return `${location.latitude.toFixed(6)},${location.longitude.toFixed(6)}`;
-}
-
 function formatCoordinates(location: ReservationLocation): string {
   return `(${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)})`;
 }
 
-function formatAddressLabel(reverseGeocodeResult: ReverseGeocodeResponse): string | null {
-  const normalizedAddress = reverseGeocodeResult.address?.trim() ?? "";
-  const normalizedCity = reverseGeocodeResult.city?.trim() ?? "";
-
-  if (normalizedAddress.length === 0 && normalizedCity.length === 0) {
-    return null;
-  }
-  if (normalizedAddress.length === 0) {
-    return normalizedCity;
-  }
-  if (normalizedCity.length === 0) {
-    return normalizedAddress;
-  }
-  if (normalizedAddress.toLowerCase().includes(normalizedCity.toLowerCase())) {
-    return normalizedAddress;
-  }
-  return `${normalizedAddress}, ${normalizedCity}`;
-}
-
-function getLocationDisplayLabel(
-  location: ReservationLocation,
-  locationLabelsByKey: Record<string, string>,
-): string {
-  return locationLabelsByKey[toLocationKey(location)] ?? formatCoordinates(location);
+function getLocationDisplayLabel(location: ReservationLocation): string {
+  return formatCoordinates(location);
 }
 
 function statusBadgeClass(status: string): string {
