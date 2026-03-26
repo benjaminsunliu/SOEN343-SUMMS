@@ -26,15 +26,33 @@ interface VehicleResponse {
   seatingCapacity?: number;
 }
 
+interface ProviderTransaction {
+  id: number;
+  reservationId: number;
+  userId: number;
+  paymentMethod: string;
+  amount: number;
+  success: boolean;
+  processorTransactionId: string;
+  createdAt: string;
+}
+
 export default function ProviderOperationsPage() {
   const [vehicles, setVehicles] = useState<VehicleResponse[]>([]);
+  const [transactions, setTransactions] = useState<ProviderTransaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingTransactions, setLoadingTransactions] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transactionError, setTransactionError] = useState<string | null>(null);
   const authUser = getAuthUser();
   const providerId = authUser?.id;
 
   useEffect(() => {
     fetchVehicles();
+  }, [providerId]);
+
+  useEffect(() => {
+    fetchTransactions();
   }, [providerId]);
 
   const fetchVehicles = async () => {
@@ -59,6 +77,29 @@ export default function ProviderOperationsPage() {
     }
   };
 
+  const fetchTransactions = async () => {
+    if (!providerId) {
+      setLoadingTransactions(false);
+      return;
+    }
+
+    setLoadingTransactions(true);
+    setTransactionError(null);
+    try {
+      const response = await apiFetch("/api/payments/transactions/provider/me");
+      if (!response.ok) {
+        throw new Error(`Failed to fetch transactions (${response.status})`);
+      }
+      const data = (await response.json()) as ProviderTransaction[];
+      setTransactions(data ?? []);
+    } catch (err) {
+      setTransactions([]);
+      setTransactionError(err instanceof Error ? err.message : "Failed to load transactions");
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
+
   // Calculate stats from vehicles
   const stats = {
     total: vehicles.length,
@@ -68,41 +109,22 @@ export default function ProviderOperationsPage() {
     unavailable: vehicles.filter(v => v.status.toUpperCase() === "UNAVAILABLE").length,
   };
 
-  const todayRevenue = 0; // Revenue will be populated from real data
-
-  // Weekly data - empty for now
-  const weeklyRevenueData = [
-    { day: "Mon", revenue: 0 },
-    { day: "Tue", revenue: 0 },
-    { day: "Wed", revenue: 0 },
-    { day: "Thu", revenue: 0 },
-    { day: "Fri", revenue: 0 },
-    { day: "Sat", revenue: 0 },
-    { day: "Sun", revenue: 0 },
+  const activeRentals = vehicles.filter(v => v.status.toUpperCase() === "IN_USE");
+  const statusBreakdown = [
+    { label: "Available", value: stats.available, color: "bg-green-500" },
+    { label: "In Use", value: stats.inUse, color: "bg-blue-500" },
+    { label: "Reserved", value: stats.reserved, color: "bg-yellow-500" },
+    { label: "Unavailable", value: stats.unavailable, color: "bg-gray-500" },
   ];
+  const maxStatusCount = Math.max(1, ...statusBreakdown.map(item => item.value));
 
-  const rentalActivityData = [
-    { day: "Mon", rentals: 0 },
-    { day: "Tue", rentals: 0 },
-    { day: "Wed", rentals: 0 },
-    { day: "Thu", rentals: 0 },
-    { day: "Fri", rentals: 0 },
-    { day: "Sat", rentals: 0 },
-    { day: "Sun", rentals: 0 },
-  ];
-
-  const activeRentals = vehicles
-    .filter(v => v.status.toUpperCase() === "IN_USE")
-    .slice(0, 3)
-    .map((v, idx) => ({
-      vehicle: `${v.type.charAt(0).toUpperCase() + v.type.slice(1)} ${v.id}`,
-      user: ["Jean Tremblay", "Marie Leblanc", "Michel Gagné"][idx] || "User",
-      startTime: ["14h15", "13h30", "15h00"][idx] || "00h00",
-      duration: ["45 min", "1h 30m", "20 min"][idx] || "30 min",
-      revenue: ["$2.25", "$18.00", "$0.67"][idx] || "$0.00",
-    }));
-
-  const maxRevenue = Math.max(...weeklyRevenueData.map(d => d.revenue));
+  const typeBreakdown = Object.entries(
+    vehicles.reduce<Record<string, number>>((acc, vehicle) => {
+      const normalizedType = vehicle.type.toUpperCase();
+      acc[normalizedType] = (acc[normalizedType] ?? 0) + 1;
+      return acc;
+    }, {}),
+  ).sort((a, b) => b[1] - a[1]);
 
   return (
     <>
@@ -129,39 +151,51 @@ export default function ProviderOperationsPage() {
           {/* Stats Cards - 4 columns */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <StatCard label="Total Vehicles" value={stats.total} icon="🚲" />
+            <StatCard label="Available Now" value={stats.available} icon="✅" />
             <StatCard label="Active Rentals" value={stats.inUse} icon="👤" />
-            <StatCard label="Today's Revenue" value={`$${todayRevenue.toFixed(0)} CAD`} icon="💵" />
-            <StatCard label="Weekly Rentals" value={rentalActivityData.reduce((s, d) => s + d.rentals, 0)} icon="📈" />
+            <StatCard label="Reserved" value={stats.reserved} icon="📌" />
           </div>
 
-          {/* Charts - 2 columns */}
+          {/* Insights - 2 columns */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            {/* Weekly Revenue Chart */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-white mb-1">Weekly Revenue</h3>
-              <p className="text-sm text-gray-400 mb-6">Revenue generated over the past week</p>
-              <div className="flex items-end justify-between h-56 gap-1.5">
-                {weeklyRevenueData.map((data) => (
-                  <div key={data.day} className="flex flex-col items-center flex-1">
-                    <div className="relative w-full flex justify-center mb-2">
+              <h3 className="text-lg font-semibold text-white mb-1">Fleet Status</h3>
+              <p className="text-sm text-gray-400 mb-6">Live availability across your vehicles</p>
+              <div className="space-y-4">
+                {statusBreakdown.map((item) => (
+                  <div key={item.label}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="text-gray-300">{item.label}</span>
+                      <span className="text-gray-400">{item.value}</span>
+                    </div>
+                    <div className="h-2 rounded bg-gray-700">
                       <div
-                        className="bg-blue-500 rounded-t w-12"
-                        style={{ height: `${Math.max(data.revenue / 523 * 160, 4)}px` }}
+                        className={`${item.color} h-2 rounded`}
+                        style={{ width: `${(item.value / maxStatusCount) * 100}%` }}
                       />
                     </div>
-                    <p className="text-xs font-medium text-gray-600">{data.day}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Rental Activity Chart */}
             <div className="bg-gray-800 rounded-lg border border-gray-700 p-6">
-              <h3 className="text-lg font-semibold text-white mb-1">Rental Activity</h3>
-              <p className="text-sm text-gray-400 mb-6">Number of rentals per day</p>
-              <div className="h-56 flex items-center justify-center text-gray-500">
-                <p>No rental data available</p>
-              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">Vehicle Types</h3>
+              <p className="text-sm text-gray-400 mb-6">Current fleet composition</p>
+              {typeBreakdown.length === 0 ? (
+                <div className="h-56 flex items-center justify-center text-gray-500">
+                  <p>No vehicles added yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {typeBreakdown.map(([type, count]) => (
+                    <div key={type} className="flex items-center justify-between rounded border border-gray-700 bg-gray-900 px-3 py-2">
+                      <span className="text-gray-300">{type}</span>
+                      <span className="font-semibold text-cyan-400">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -171,39 +205,105 @@ export default function ProviderOperationsPage() {
               <span className="text-lg">📋</span>
               <h3 className="text-lg font-semibold text-white">Active Rentals</h3>
             </div>
-            <p className="text-sm text-gray-400 mb-4">Currently rented vehicles</p>
+            <p className="text-sm text-gray-400 mb-4">Vehicles currently in use</p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-700">
                     <th className="text-left font-semibold text-gray-300 py-3 px-4">Vehicle</th>
-                    <th className="text-left font-semibold text-gray-300 py-3 px-4">User</th>
-                    <th className="text-left font-semibold text-gray-300 py-3 px-4">Start Time</th>
-                    <th className="text-left font-semibold text-gray-300 py-3 px-4">Duration</th>
-                    <th className="text-right font-semibold text-gray-300 py-3 px-4">Revenue</th>
+                    <th className="text-left font-semibold text-gray-300 py-3 px-4">Type</th>
+                    <th className="text-left font-semibold text-gray-300 py-3 px-4">Location</th>
+                    <th className="text-right font-semibold text-gray-300 py-3 px-4">Rate</th>
                   </tr>
                 </thead>
                 <tbody>
                   {activeRentals.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-gray-500">
+                      <td colSpan={4} className="py-8 text-center text-gray-500">
                         No active rentals
                       </td>
                     </tr>
                   ) : (
-                    activeRentals.map((rental, idx) => (
-                      <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
-                        <td className="py-3 px-4 text-gray-300">{rental.vehicle}</td>
-                        <td className="py-3 px-4 text-gray-400">{rental.user}</td>
-                        <td className="py-3 px-4 text-gray-400">{rental.startTime}</td>
-                        <td className="py-3 px-4 text-gray-400">{rental.duration}</td>
-                        <td className="py-3 px-4 text-right text-cyan-400 font-medium">{rental.revenue}</td>
+                    activeRentals.map((vehicle) => (
+                      <tr key={vehicle.id} className="border-b border-gray-700 hover:bg-gray-700">
+                        <td className="py-3 px-4 text-gray-300">
+                          {vehicle.type.toUpperCase()} #{vehicle.id}
+                        </td>
+                        <td className="py-3 px-4 text-gray-400 capitalize">{vehicle.type}</td>
+                        <td className="py-3 px-4 text-gray-400 text-xs">
+                          {vehicle.location.latitude.toFixed(4)}, {vehicle.location.longitude.toFixed(4)}
+                        </td>
+                        <td className="py-3 px-4 text-right text-cyan-400 font-medium">
+                          ${vehicle.costPerMinute.toFixed(2)}/min CAD
+                        </td>
                       </tr>
                     ))
                   )}
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Recent Payment Transactions */}
+          <div className="bg-gray-800 rounded-lg border border-gray-700 p-6 mb-8">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-lg">💳</span>
+              <h3 className="text-lg font-semibold text-white">Recent Payment Transactions</h3>
+            </div>
+            <p className="text-sm text-gray-400 mb-4">Payments tied to reservations on your vehicles</p>
+
+            {transactionError && (
+              <div className="mb-4 rounded border border-red-500 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+                {transactionError}
+              </div>
+            )}
+
+            {loadingTransactions ? (
+              <div className="py-6 text-center text-gray-400">Loading transactions...</div>
+            ) : transactions.length === 0 ? (
+              <div className="py-6 text-center text-gray-500">No payment transactions found yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-700">
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Date</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Reservation</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">User</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Method</th>
+                      <th className="text-right font-semibold text-gray-300 py-3 px-4">Amount</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Status</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Transaction ID</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transactions.slice(0, 12).map((transaction) => (
+                      <tr key={transaction.id} className="border-b border-gray-700 hover:bg-gray-700/40">
+                        <td className="py-3 px-4 text-gray-300">{formatDateTime(transaction.createdAt)}</td>
+                        <td className="py-3 px-4 text-gray-300">#{transaction.reservationId}</td>
+                        <td className="py-3 px-4 text-gray-400">#{transaction.userId}</td>
+                        <td className="py-3 px-4 text-gray-300">{transaction.paymentMethod}</td>
+                        <td className="py-3 px-4 text-right text-cyan-400">
+                          ${transaction.amount.toFixed(2)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`rounded px-2 py-1 text-xs font-semibold ${
+                              transaction.success
+                                ? "bg-green-500/20 text-green-300 border border-green-500/50"
+                                : "bg-amber-500/20 text-amber-300 border border-amber-500/50"
+                            }`}
+                          >
+                            {transaction.success ? "SUCCESS" : "FAILED"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-400">{transaction.processorTransactionId}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* Manage Vehicles Table */}
@@ -228,15 +328,14 @@ export default function ProviderOperationsPage() {
                       <th className="text-left font-semibold text-gray-300 py-3 px-4">Type</th>
                       <th className="text-left font-semibold text-gray-300 py-3 px-4">Status</th>
                       <th className="text-left font-semibold text-gray-300 py-3 px-4">Location</th>
-                      <th className="text-center font-semibold text-gray-300 py-3 px-4">Battery</th>
                       <th className="text-left font-semibold text-gray-300 py-3 px-4">Price</th>
-                      <th className="text-center font-semibold text-gray-300 py-3 px-4">Total Rentals</th>
+                      <th className="text-left font-semibold text-gray-300 py-3 px-4">Details</th>
                     </tr>
                   </thead>
                   <tbody>
                     {vehicles.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-gray-500">
+                        <td colSpan={6} className="py-8 text-center text-gray-500">
                           No vehicles. <a href="/provider/vehicles" className="text-cyan-400 hover:text-cyan-300">Add one</a>
                         </td>
                       </tr>
@@ -262,9 +361,8 @@ export default function ProviderOperationsPage() {
                             <td className="py-3 px-4 text-gray-400 text-xs">
                                {vehicle.location.latitude.toFixed(2)}, {vehicle.location.longitude.toFixed(2)}
                             </td>
-                            <td className="py-3 px-4 text-center text-gray-400"> 85%</td>
-                            <td className="py-3 px-4 text-gray-300 font-medium">${vehicle.costPerMinute.toFixed(2)}/hr CAD</td>
-                            <td className="py-3 px-4 text-center text-gray-400">{Math.floor(Math.random() * 300)}</td>
+                            <td className="py-3 px-4 text-gray-300 font-medium">${vehicle.costPerMinute.toFixed(2)}/min CAD</td>
+                            <td className="py-3 px-4 text-gray-400">{getVehicleDetail(vehicle)}</td>
                           </tr>
                         );
                       })
@@ -278,6 +376,14 @@ export default function ProviderOperationsPage() {
       </main>
     </>
   );
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
 }
 
 interface StatCardProps {
@@ -327,6 +433,28 @@ function StatusBadge({ status }: StatusBadgeProps) {
   );
 }
 
+function getVehicleDetail(vehicle: VehicleResponse): string {
+  const normalizedType = vehicle.type.toUpperCase();
+  if (normalizedType === "CAR") {
+    if (vehicle.licensePlate && vehicle.seatingCapacity != null) {
+      return `${vehicle.licensePlate} · ${vehicle.seatingCapacity} seats`;
+    }
+    if (vehicle.licensePlate) {
+      return vehicle.licensePlate;
+    }
+    if (vehicle.seatingCapacity != null) {
+      return `${vehicle.seatingCapacity} seats`;
+    }
+    return "No car details";
+  }
+
+  if (normalizedType === "SCOOTER" && vehicle.maxRange != null) {
+    return `${vehicle.maxRange.toFixed(1)} km range`;
+  }
+
+  return "N/A";
+}
+
 function getVehicleIcon(type: string) {
   switch (type.toUpperCase()) {
     case "BICYCLE":
@@ -339,4 +467,3 @@ function getVehicleIcon(type: string) {
       return "🚙";
   }
 }
-

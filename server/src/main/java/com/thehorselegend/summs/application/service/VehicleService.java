@@ -52,7 +52,7 @@ public class VehicleService {
      */
     public VehicleResponse createBicycle(CreateBicycleRequest request) {
         validateProviderId(request.providerId());
-        Location location = dtoToLocation(request.location());
+        Location location = resolveLocation(request.location());
 
         Bicycle bicycle = VehicleFactory.createBicycle(location, request.providerId(), request.costPerMinute());
         VehicleEntity savedEntity = vehicleRepository.save(VehicleMapper.toEntity(bicycle));
@@ -70,7 +70,7 @@ public class VehicleService {
      */
     public VehicleResponse createScooter(CreateScooterRequest request) {
         validateProviderId(request.providerId());
-        Location location = dtoToLocation(request.location());
+        Location location = resolveLocation(request.location());
 
         Scooter scooter = VehicleFactory.createScooter(location, request.providerId(), request.costPerMinute(), request.maxRange());
         VehicleEntity savedEntity = vehicleRepository.save(VehicleMapper.toEntity(scooter));
@@ -88,7 +88,7 @@ public class VehicleService {
      */
     public VehicleResponse createCar(CreateCarRequest request) {
         validateProviderId(request.providerId());
-        Location location = dtoToLocation(request.location());
+        Location location = resolveLocation(request.location());
 
         Car car = VehicleFactory.createCar(location, request.providerId(), request.costPerMinute(), 
                 request.licensePlate(), request.seatingCapacity());
@@ -206,23 +206,35 @@ public class VehicleService {
     // Note: Handles all vehicle subtypes (Bicycle, Scooter, Car).
     private VehicleResponse vehicleToResponse(Vehicle vehicle) {
         LocationDto locationDto = locationToDto(vehicle.getLocation());
+        String locationAddress = null;
+        String locationCity = null;
         
         Double maxRange = null;
         String licensePlate = null;
         Integer seatingCapacity = null;
 
-        if (vehicle instanceof Scooter scooter) {
-            maxRange = scooter.getMaxRange();
-        } else if (vehicle instanceof Car car) {
+        String type;
+        if (vehicle instanceof Car car) {
+            type = VehicleType.CAR.name();
             licensePlate = car.getLicensePlate();
             seatingCapacity = car.getSeatingCapacity();
+        } else if (vehicle instanceof Scooter scooter) {
+            type = VehicleType.SCOOTER.name();
+            maxRange = scooter.getMaxRange();
+        } else if (vehicle instanceof Bicycle) {
+            type = VehicleType.BICYCLE.name();
+        } else {
+            type = null;
         }
+
 
         return new VehicleResponse(
                 vehicle.getId(),
-                vehicle.getType().name(),
+                type,
                 vehicle.getStatus().name(),
                 locationDto,
+                locationAddress,
+                locationCity,
                 vehicle.getProviderId(),
                 vehicle.getCostPerMinute(),
                 maxRange,
@@ -234,6 +246,13 @@ public class VehicleService {
     // Converts a LocationDto to a domain Location record.
     private Location dtoToLocation(LocationDto dto) {
         return new Location(dto.latitude(), dto.longitude());
+    }
+
+    private Location resolveLocation(LocationDto locationDto) {
+        if (locationDto == null) {
+            throw new IllegalArgumentException("Location coordinates are required");
+        }
+        return dtoToLocation(locationDto);
     }
 
      // Converts a domain Location record to a LocationDto.
