@@ -38,11 +38,12 @@ public class VehicleSearchService {
             double userLat,
             double userLon,
             double radiusKm,
-            String typeFilter
-    ) {
+            String typeFilter) {
         List<Vehicle> nearbyVehicles = findNearbyVehicles(userLat, userLon, radiusKm);
         List<Vehicle> filteredByType = applyTypeFilter(nearbyVehicles, typeFilter);
         WeatherCondition weather = resolveWeatherCondition(userLat, userLon);
+        //WeatherCondition weather = new WeatherCondition("Rain", Severity.HIGH);
+        //WeatherCondition weather = new WeatherCondition("Clear", Severity.LOW);
 
         List<ContextAwareVehicleResponse> contextAwareVehicles = filteredByType.stream()
                 .map(vehicle -> vehicleToContextAwareResponse(vehicle, weather))
@@ -52,16 +53,19 @@ public class VehicleSearchService {
                 weather.getType(),
                 weather.getSeverity().name(),
                 buildWeatherAdvisory(weather),
-                contextAwareVehicles
-        );
+                contextAwareVehicles);
     }
 
     private boolean matchesType(Vehicle vehicle, String typeFilter) {
         switch (typeFilter.toLowerCase()) {
-            case "car": return vehicle instanceof Car;
-            case "scooter": return vehicle instanceof Scooter;
-            case "bicycle": return vehicle instanceof Bicycle;
-            default: return false;
+            case "car":
+                return vehicle instanceof Car;
+            case "scooter":
+                return vehicle instanceof Scooter;
+            case "bicycle":
+                return vehicle instanceof Bicycle;
+            default:
+                return false;
         }
     }
 
@@ -86,8 +90,7 @@ public class VehicleSearchService {
 
     private ContextAwareVehicleResponse vehicleToContextAwareResponse(
             Vehicle vehicle,
-            WeatherCondition weather
-    ) {
+            WeatherCondition weather) {
         LocationDto locationDto = locationToDto(vehicle.getLocation());
         String locationAddress = null;
         String locationCity = null;
@@ -126,8 +129,7 @@ public class VehicleSearchService {
                 licensePlate,
                 seatingCapacity,
                 weatherRisky,
-                weatherRiskMessage
-        );
+                weatherRiskMessage);
     }
 
     private boolean isWeatherRisky(Vehicle vehicle, WeatherCondition weather) {
@@ -158,8 +160,7 @@ public class VehicleSearchService {
     private Vehicle mapToConcreteVehicle(VehicleEntity entity) {
         Location loc = new Location(
                 entity.getLocation().getLatitude(),
-                entity.getLocation().getLongitude()
-        );
+                entity.getLocation().getLongitude());
 
         if (entity instanceof CarEntity carEntity) {
             return new Car(
@@ -169,8 +170,7 @@ public class VehicleSearchService {
                     carEntity.getProviderId(),
                     carEntity.getCostPerMinute(),
                     carEntity.getLicensePlate(),
-                    4
-            );
+                    4);
         } else if (entity instanceof ScooterEntity scooterEntity) {
             return new Scooter(
                     scooterEntity.getId(),
@@ -178,16 +178,14 @@ public class VehicleSearchService {
                     loc,
                     scooterEntity.getProviderId(),
                     scooterEntity.getCostPerMinute(),
-                    scooterEntity.getMaxRange()
-            );
+                    scooterEntity.getMaxRange());
         } else if (entity instanceof BicycleEntity bicycleEntity) {
             return new Bicycle(
                     bicycleEntity.getId(),
                     bicycleEntity.getStatus(),
                     loc,
                     bicycleEntity.getProviderId(),
-                    bicycleEntity.getCostPerMinute()
-            );
+                    bicycleEntity.getCostPerMinute());
         } else {
             throw new IllegalArgumentException("Unknown vehicle type: " + entity.getClass().getSimpleName());
         }
