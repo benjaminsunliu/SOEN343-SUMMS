@@ -1,9 +1,9 @@
 package com.thehorselegend.summs.domain.vehicle;
 
 public class Car extends Vehicle {
-    
-    private String licensePlate;
-    private Integer seatingCapacity;
+
+    private final String licensePlate;
+    private final Integer seatingCapacity;
 
     public Car(
             Long id,
@@ -22,15 +22,8 @@ public class Car extends Vehicle {
         return licensePlate;
     }
 
-    public void setLicensePlate(String licensePlate) {
-        this.licensePlate = licensePlate;
-    }
-
     public Integer getSeatingCapacity() {
         return seatingCapacity;
     }
 
-    public void setSeatingCapacity(Integer seatingCapacity) {
-        this.seatingCapacity = seatingCapacity;
-    }
 }

@@ -24,6 +24,8 @@ interface VehicleResponse {
   type: string;
   status: string;
   location: LocationDto;
+  locationAddress: string | null;
+  locationCity: string | null;
   providerId: number;
   costPerMinute: number;
   maxRange?: number;
@@ -190,17 +192,20 @@ function AddVehicleForm({
         throw new Error("Please fill in all required fields");
       }
 
+      const costPerMinute = parseFloat(formData.costPerMinute);
       const latitude = parseFloat(formData.latitude);
       const longitude = parseFloat(formData.longitude);
-      const costPerMinute = parseFloat(formData.costPerMinute);
 
-      if (isNaN(latitude) || isNaN(longitude) || isNaN(costPerMinute)) {
+      if (isNaN(costPerMinute) || isNaN(latitude) || isNaN(longitude)) {
         throw new Error("Invalid number format");
       }
 
       let endpoint = "";
       let body: Record<string, unknown> = {
-        location: { latitude, longitude },
+        location: {
+          latitude,
+          longitude,
+        },
         providerId,
         costPerMinute,
       };
@@ -236,10 +241,8 @@ function AddVehicleForm({
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          (errorData as Record<string, unknown>).message || "Failed to create vehicle"
-        );
+        const errorData = await response.json().catch(() => null);
+        throw new Error(extractErrorMessage(errorData, "Failed to create vehicle"));
       }
 
       setFormData({
@@ -304,7 +307,7 @@ function AddVehicleForm({
             <input
               type="number"
               step="0.000001"
-              placeholder="45.501689"
+              placeholder="e.g. 45.501700"
               value={formData.latitude}
               onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
               className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -319,7 +322,7 @@ function AddVehicleForm({
             <input
               type="number"
               step="0.000001"
-              placeholder="-73.567256"
+              placeholder="e.g. -73.567300"
               value={formData.longitude}
               onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
               className="w-full px-3 py-2 border border-gray-600 rounded-lg bg-gray-700 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -460,7 +463,7 @@ function VehicleCard({ vehicle, onDelete, vehicleNumber }: VehicleCardProps) {
               <div>
                 <p className="text-gray-500 text-xs">Location</p>
                 <p className="font-medium text-gray-300">
-                  {vehicle.location.latitude.toFixed(4)}, {vehicle.location.longitude.toFixed(4)}
+                  {formatVehicleLocation(vehicle)}
                 </p>
               </div>
               <div>
@@ -499,3 +502,34 @@ function VehicleCard({ vehicle, onDelete, vehicleNumber }: VehicleCardProps) {
   );
 }
 
+function extractErrorMessage(errorData: unknown, fallbackMessage: string): string {
+  if (!errorData || typeof errorData !== "object") {
+    return fallbackMessage;
+  }
+
+  const maybeMessage = (errorData as { message?: unknown }).message;
+  if (typeof maybeMessage === "string" && maybeMessage.trim().length > 0) {
+    return maybeMessage;
+  }
+
+  const maybeError = (errorData as { error?: unknown }).error;
+  if (typeof maybeError === "string" && maybeError.trim().length > 0) {
+    return maybeError;
+  }
+
+  return fallbackMessage;
+}
+
+function formatVehicleLocation(vehicle: VehicleResponse): string {
+  const normalizedAddress = vehicle.locationAddress?.trim();
+  if (normalizedAddress) {
+    return normalizedAddress;
+  }
+
+  const normalizedCity = vehicle.locationCity?.trim();
+  if (normalizedCity) {
+    return normalizedCity;
+  }
+
+  return `${vehicle.location.latitude.toFixed(4)}, ${vehicle.location.longitude.toFixed(4)}`;
+}

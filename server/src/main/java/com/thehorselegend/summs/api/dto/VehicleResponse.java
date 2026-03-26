@@ -10,6 +10,8 @@ public record VehicleResponse(
         String type,            // BICYCLE, SCOOTER, or CAR
         String status,          // AVAILABLE, RESERVED, IN_USE, UNAVAILABLE
         LocationDto location,
+        String locationAddress,
+        String locationCity,
         Long providerId,
         Double costPerMinute,
         

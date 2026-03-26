@@ -1,12 +1,12 @@
 package com.thehorselegend.summs.domain.vehicle;
 
 public abstract class Vehicle {
-    
-    private Long id;
-    private VehicleType type;
+
+    private final Long id;
+    private final VehicleType type;
     private VehicleStatus status;
     private Location location;
-    private Long providerId;
+    private final Long providerId;
     private Double costPerMinute;
 
     // Constructor's protected as it's used primarily by 
@@ -26,13 +26,37 @@ public abstract class Vehicle {
         this.costPerMinute = costPerMinute;
     }
 
-    // Getters
-    public Long getId() {
-        return id;
-    }
-
     public VehicleType getType() {
         return type;
+    }
+
+    public boolean isAvailable() {
+        return status == VehicleStatus.AVAILABLE;
+    }
+
+    public void reserve() {
+        if (status != VehicleStatus.AVAILABLE) throw new IllegalStateException("Vehicle not available");
+        this.status = VehicleStatus.RESERVED;
+    }
+
+    public void startTrip() {
+        if (status != VehicleStatus.RESERVED) {
+            throw new IllegalStateException("Vehicle must be reserved before a trip starts");
+        }
+        this.status = VehicleStatus.IN_USE;
+    }
+
+    public void makeAvailable() {
+        this.status = VehicleStatus.AVAILABLE;
+    }
+
+    public void release(Location newLocation) {
+        this.status = VehicleStatus.AVAILABLE;
+        this.location = newLocation;
+    }
+
+    public Long getId() {
+        return id;
     }
 
     public VehicleStatus getStatus() {
@@ -51,20 +75,8 @@ public abstract class Vehicle {
         return costPerMinute;
     }
 
-    // Setters
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public void setStatus(VehicleStatus status) {
-        this.status = status;
-    }
-
-    public void setLocation(Location location) {
-        this.location = location;
-    }
-
-    public void setCostPerMinute(Double costPerMinute) {
+    public void setStatus(Double costPerMinute) {
         this.costPerMinute = costPerMinute;
     }
+
 }

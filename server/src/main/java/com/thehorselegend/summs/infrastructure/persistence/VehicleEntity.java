@@ -21,10 +21,6 @@ public abstract class VehicleEntity {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, insertable = false, updatable = false)
-    private VehicleType type;
-
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private VehicleStatus status;
 
@@ -42,13 +38,11 @@ public abstract class VehicleEntity {
 
     public VehicleEntity(
             Long id,
-            VehicleType type,
             VehicleStatus status,
             LocationEmbeddable location,
             Long providerId,
             Double costPerMinute) {
         this.id = id;
-        this.type = type;
         this.status = status;
         this.location = location;
         this.providerId = providerId;
@@ -58,10 +52,6 @@ public abstract class VehicleEntity {
     // Getters
     public Long getId() {
         return id;
-    }
-
-    public VehicleType getType() {
-        return type;
     }
 
     public VehicleStatus getStatus() {
@@ -83,10 +73,6 @@ public abstract class VehicleEntity {
     // Setters
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public void setType(VehicleType type) {
-        this.type = type;
     }
 
     public void setStatus(VehicleStatus status) {

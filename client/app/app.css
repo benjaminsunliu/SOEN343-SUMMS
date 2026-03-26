@@ -9,3 +9,15 @@ html,
 body {
   @apply bg-white overflow-x-hidden;
 }
+
+/* Leaflet / map helpers */
+.map-wrapper {
+  width: 100%;
+  height: 500px; /* Adjust as needed for your layout */
+}
+
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+}
+
