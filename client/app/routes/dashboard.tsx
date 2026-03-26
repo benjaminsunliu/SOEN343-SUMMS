@@ -307,8 +307,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <SiteNav />
-      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <header className="mb-3 border-b border-[#253047] pb-2.5">
           <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
         </header>
@@ -351,7 +350,7 @@ export default function DashboardPage() {
         </section>
 
          <section className="grid gap-3 xl:grid-cols-[1.8fr_1fr]">
-           <article className="rounded-xl border border-[#2a354a] bg-black">
+           <article className="rounded-xl border border-[#2a354a] bg-gray-900">
              <h2 className="border-b border-[#2a354a] px-4 py-2.5 text-xl font-semibold">Live City Map</h2>
              <div className="p-3.5">
                <div className="relative h-56 overflow-hidden rounded-lg border border-[#1f2e49]">
@@ -367,28 +366,28 @@ export default function DashboardPage() {
                      onClick={() =>
                        setMapCenter([userLocation.latitude, userLocation.longitude])
                      }
-                     className="absolute right-3 top-3 z-[500] rounded-md border border-cyan-300 bg-black/80 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-black"
+                     className="absolute right-3 top-3 z-[500] rounded-md border border-cyan-300 bg-gray-900/80 px-2.5 py-1 text-xs font-semibold text-cyan-200 hover:bg-gray-900"
                    >
                      My Location
                    </button>
                  )}
 
                  {isLoadingMap && (
-                   <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-gray-200 bg-black/40">
+                   <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-gray-200 bg-gray-900/40">
                      Loading vehicles...
                    </p>
                  )}
                  {!isLoadingMap && mapMarkers.length === 0 && (
-                   <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-gray-200 bg-black/40">
+                   <p className="pointer-events-none absolute inset-0 grid place-items-center text-sm text-gray-200 bg-gray-900/40">
                      {mapError ?? "No available vehicle coordinates to display."}
                    </p>
                  )}
                </div>
                <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                 <span className="rounded-md bg-black px-3 py-1 text-cyan-400">Bike: {vehiclesByType.bikes}</span>
-                 <span className="rounded-md bg-black px-3 py-1 text-blue-500">Car: {vehiclesByType.cars}</span>
-                 <span className="rounded-md bg-black px-3 py-1 text-red-400">Scooter: {vehiclesByType.scooters}</span>
-                 <span className="rounded-md bg-black px-3 py-1 text-gray-300">Available: {availableVehicles.length}</span>
+                 <span className="rounded-md bg-gray-900 px-3 py-1 text-cyan-400">Bike: {vehiclesByType.bikes}</span>
+                 <span className="rounded-md bg-gray-900 px-3 py-1 text-blue-500">Car: {vehiclesByType.cars}</span>
+                 <span className="rounded-md bg-gray-900 px-3 py-1 text-red-400">Scooter: {vehiclesByType.scooters}</span>
+                 <span className="rounded-md bg-gray-900 px-3 py-1 text-gray-300">Available: {availableVehicles.length}</span>
                </div>
              </div>
            </article>

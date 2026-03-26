@@ -318,7 +318,7 @@ export default function ReservationPage() {
   return (
     <>
       <SiteNav />
-      <main className="ml-56 min-h-screen bg-black px-5 py-4 text-white">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <header className="mb-4 border-b border-[#253047] pb-3">
           <h1 className="text-2xl font-bold tracking-tight text-cyan-400">Reservation</h1>
         </header>
