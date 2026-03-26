@@ -85,6 +85,12 @@ const navSections: NavSection[] = [
       { label: "Provider Dashboard", to: "/provider/operations", roles: ["PROVIDER", "ADMIN"] },
     ],
   },
+  {
+    title: "Admin",
+    items: [
+      { label: "System Analytics", to: "/admin/analytics", roles: ["ADMIN"] },
+    ],
+  },
 ];
 
 export function SiteNav() {
