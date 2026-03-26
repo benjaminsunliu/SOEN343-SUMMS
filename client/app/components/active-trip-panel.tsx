@@ -26,6 +26,14 @@ function formatElapsed(totalSeconds: number): string {
   return [hours, minutes, seconds].map((value) => String(value).padStart(2, "0")).join(":");
 }
 
+function formatCoordinates(latitude: number, longitude: number): string {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return "(Coordinates unavailable)";
+  }
+
+  return `(${latitude.toFixed(6)}, ${longitude.toFixed(6)})`;
+}
+
 export default function ActiveTrip({
   trip,
   selectedDropOffKey,
@@ -106,7 +114,7 @@ export default function ActiveTrip({
                 key={option.key}
                 value={option.key}
               >
-                {option.label}
+                {`${option.label} ${formatCoordinates(option.latitude, option.longitude)}`}
               </option>
             ))}
           </select>

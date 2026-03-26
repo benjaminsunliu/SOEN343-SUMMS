@@ -1,6 +1,7 @@
 package com.thehorselegend.summs.api.controller;
 
 import com.thehorselegend.summs.api.dto.StartTripRequest;
+import com.thehorselegend.summs.api.dto.StartTripPaymentRequest;
 import com.thehorselegend.summs.api.dto.TripResponse;
 import com.thehorselegend.summs.api.dto.VehicleReservationRequest;
 import com.thehorselegend.summs.api.dto.VehicleReservationResponse;
@@ -79,11 +80,14 @@ public class ReservationController {
     @PreAuthorize("hasAnyRole('CITIZEN', 'ADMIN')")
     public TripResponse startTripFromReservation(
             @PathVariable Long reservationId,
+            @Valid @RequestBody StartTripPaymentRequest request,
             Authentication authentication
     ) {
         Long userId = resolveAuthenticatedUserId(authentication);
-        String paymentAuthCode = "PAY-" + System.currentTimeMillis();
-        return rentalLifecycleService.startTrip(userId, new StartTripRequest(reservationId, paymentAuthCode));
+        return rentalLifecycleService.startTrip(
+                userId,
+                new StartTripRequest(reservationId, request.paymentAuthorizationCode())
+        );
     }
 
     /**

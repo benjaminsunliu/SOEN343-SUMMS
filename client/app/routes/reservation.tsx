@@ -450,23 +450,23 @@ export default function ReservationPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="start-address" className="mb-1.5 block text-sm uppercase text-gray-300">
-                      Start Address
-                    </label>
-                    <input
-                      id="start-address"
-                      type="text"
-                      value={startAddress}
-                      readOnly
-                      className="w-full cursor-not-allowed rounded-xl border border-[#50617c] bg-[#0f1c33] px-3 py-2.5 text-base text-gray-200 outline-none"
-                    />
-                    <p className="mt-1 text-xs text-gray-400">
-                      Fixed to selected vehicle location.
-                    </p>
-                  </div>
+                <div>
+                  <label htmlFor="start-address" className="mb-1.5 block text-sm uppercase text-gray-300">
+                    Start Address
+                  </label>
+                  <input
+                    id="start-address"
+                    type="text"
+                    value={startAddress}
+                    readOnly
+                    className="w-full cursor-not-allowed rounded-xl border border-[#50617c] bg-[#0f1c33] px-3 py-2.5 text-base text-gray-200 outline-none"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">
+                    Fixed to selected vehicle location.
+                  </p>
+                </div>
 
+                <div className="grid gap-4 sm:grid-cols-2">
                   <div>
                     <label htmlFor="end-latitude" className="mb-1.5 block text-sm uppercase text-gray-300">
                       End Latitude
@@ -482,22 +482,22 @@ export default function ReservationPage() {
                       required
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label htmlFor="end-longitude" className="mb-1.5 block text-sm uppercase text-gray-300">
-                    End Longitude
-                  </label>
-                  <input
-                    id="end-longitude"
-                    type="number"
-                    step="0.000001"
-                    value={endLongitude}
-                    onChange={(event) => setEndLongitude(event.target.value)}
-                    placeholder="e.g. -73.567300"
-                    className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
-                    required
-                  />
+                  <div>
+                    <label htmlFor="end-longitude" className="mb-1.5 block text-sm uppercase text-gray-300">
+                      End Longitude
+                    </label>
+                    <input
+                      id="end-longitude"
+                      type="number"
+                      step="0.000001"
+                      value={endLongitude}
+                      onChange={(event) => setEndLongitude(event.target.value)}
+                      placeholder="e.g. -73.567300"
+                      className="w-full rounded-xl border border-[#50617c] bg-[#13233d] px-3 py-2.5 text-base outline-none"
+                      required
+                    />
+                  </div>
                 </div>
 
                 <button
