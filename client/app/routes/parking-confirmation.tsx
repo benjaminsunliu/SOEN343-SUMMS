@@ -72,9 +72,11 @@ function PaymentMethodBtn({
 function SuccessScreen({
   reservation,
   onBack,
+  onViewReservations,
 }: {
   reservation: ParkingReservationResponse;
   onBack: () => void;
+  onViewReservations: () => void;
 }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-full py-16 text-center px-6">
@@ -117,13 +119,22 @@ function SuccessScreen({
         </p>
       </div>
 
-      <button
-        onClick={onBack}
-        className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold
-                   px-8 py-3 rounded-xl transition-colors"
-      >
-        Back to Parking
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          onClick={onViewReservations}
+          className="bg-cyan-500 hover:bg-cyan-400 text-black font-bold
+                     px-8 py-3 rounded-xl transition-colors"
+        >
+          View My Reservations
+        </button>
+        <button
+          onClick={onBack}
+          className="border border-gray-600 bg-transparent text-gray-200 font-bold
+                     px-8 py-3 rounded-xl transition-colors hover:border-gray-400"
+        >
+          Back to Parking
+        </button>
+      </div>
     </div>
   );
 }
@@ -219,6 +230,7 @@ export default function ParkingConfirmationPage() {
       <div className="flex flex-col h-full bg-gray-900 overflow-y-auto">
         <SuccessScreen
           reservation={confirmed}
+          onViewReservations={() => navigate("/my-reservations")}
           onBack={() => navigate("/services/parking")}
         />
       </div>
@@ -431,5 +443,4 @@ export default function ParkingConfirmationPage() {
     </div>
   );
 }
-
 

@@ -1,7 +1,11 @@
 package com.thehorselegend.summs.infrastructure.persistence;
 
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -35,9 +39,10 @@ public class ParkingReservationEntity {
     @Column(nullable = false)
     private Long userId;
 
-    // CONFIRMED or CANCELLED
-    @Column(nullable = false)
-    private String status;
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    private ReservationStatus status;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -45,6 +50,6 @@ public class ParkingReservationEntity {
     @PrePersist
     public void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
-        if (status == null)    status = "CONFIRMED";
+        if (status == null)    status = ReservationStatus.CONFIRMED;
     }
 }

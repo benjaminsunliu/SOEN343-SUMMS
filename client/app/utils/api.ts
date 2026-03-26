@@ -121,6 +121,7 @@ export interface ParkingReservationResponse {
   reservationId:  number;
   facilityName:   string;
   facilityAddress:string;
+  city:           string;
   arrivalDate:    string;
   arrivalTime:    string;
   durationHours:  number;
@@ -143,4 +144,26 @@ export async function createParkingReservation(
   }
 
   return res.json();
+}
+
+export async function listParkingReservations(): Promise<ParkingReservationResponse[]> {
+  const res = await apiFetch("/api/parking/reservations");
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load parking reservations");
+  }
+
+  return res.json();
+}
+
+export async function cancelParkingReservation(reservationId: number): Promise<void> {
+  const res = await apiFetch(`/api/parking/reservations/${reservationId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Could not cancel parking reservation");
+  }
 }

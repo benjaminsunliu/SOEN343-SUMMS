@@ -10,6 +10,7 @@ public class ParkingReservationResponse {
     private Long   reservationId;
     private String facilityName;
     private String facilityAddress;
+    private String city;
     private String arrivalDate;
     private String arrivalTime;
     private Integer durationHours;

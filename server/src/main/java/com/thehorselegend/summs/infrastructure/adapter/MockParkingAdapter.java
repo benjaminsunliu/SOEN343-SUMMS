@@ -2,6 +2,7 @@ package com.thehorselegend.summs.infrastructure.adapter;
 
 import com.thehorselegend.summs.api.dto.ParkingFacilityDTO;
 import com.thehorselegend.summs.api.dto.ParkingSearchRequestDTO;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Primary;
@@ -72,7 +73,7 @@ public class MockParkingAdapter implements IParkingService {
                 .map(f -> {
                     // Count confirmed reservations for this facility and subtract
                     int booked = reservationRepository
-                            .countByFacilityIdAndStatus(f.getFacilityId(), "CONFIRMED");
+                            .countByFacilityIdAndStatus(f.getFacilityId(), ReservationStatus.CONFIRMED);
                     int realAvailable = Math.max(0, f.getAvailableSpots() - booked);
 
                     // Recalculate availability status based on real count
