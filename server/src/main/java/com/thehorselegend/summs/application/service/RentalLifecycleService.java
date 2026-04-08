@@ -20,8 +20,6 @@ import com.thehorselegend.summs.shared.time.SummsTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-
 @Service
 public class RentalLifecycleService {
 
@@ -40,8 +38,7 @@ public class RentalLifecycleService {
     private static final double PLATEAU_MIN_LON = -73.6100;
     private static final double PLATEAU_MAX_LON = -73.5600;
     private static final double RESERVATION_DESTINATION_TOLERANCE = 0.0020;
-    private static final String INVALID_DROPOFF_MESSAGE =
-            "Trip cannot be ended outside a valid drop-off zone or your reserved destination.";
+    private static final String INVALID_DROPOFF_MESSAGE = "Trip cannot be ended outside a valid drop-off zone or your reserved destination.";
 
     private final TripRepository tripRepository;
     private final VehicleRepository vehicleRepository;
@@ -62,14 +59,16 @@ public class RentalLifecycleService {
                 .map(ReservationMapper::toDomain)
                 .filter(VehicleReservation.class::isInstance)
                 .map(VehicleReservation.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Reservation not found with id: " + request.reservationId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Reservation not found with id: " + request.reservationId()));
 
         validateReservation(reservation, citizenId);
         authorizePayment(request.paymentAuthorizationCode());
 
         Vehicle vehicle = vehicleRepository.findById(reservation.getReservableId())
                 .map(VehicleMapper::toDomain)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + reservation.getReservableId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Vehicle not found with id: " + reservation.getReservableId()));
 
         if (tripRepository.findByVehicleIdAndEndTimeIsNull(vehicle.getId()).isPresent()) {
             throw new IllegalArgumentException("Vehicle already has an active trip.");
@@ -105,7 +104,8 @@ public class RentalLifecycleService {
                 .map(ReservationMapper::toDomain)
                 .filter(VehicleReservation.class::isInstance)
                 .map(VehicleReservation.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Reservation not found with id: " + trip.getReservationId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Reservation not found with id: " + trip.getReservationId()));
 
         LocationDto dropOffLocation = request.dropOffLocation();
         boolean endedInValidZone = isValidDropOffZone(dropOffLocation);
@@ -175,6 +175,10 @@ public class RentalLifecycleService {
         return toResponse(trip, vehicle.getStatus());
     }
 
+    public boolean hasActiveTripForCitizen(Long citizenId) {
+        return tripRepository.findByCitizenIdAndEndTimeIsNull(citizenId).isPresent();
+    }
+
     private void validateReservation(VehicleReservation reservation, Long citizenId) {
         if (!reservation.getUserId().equals(citizenId)) {
             throw new IllegalArgumentException("Reservation does not belong to the authenticated citizen.");
@@ -201,7 +205,8 @@ public class RentalLifecycleService {
 
         return isInsideZone(latitude, longitude, DOWNTOWN_MIN_LAT, DOWNTOWN_MAX_LAT, DOWNTOWN_MIN_LON, DOWNTOWN_MAX_LON)
                 || isInsideZone(latitude, longitude, VERDUN_MIN_LAT, VERDUN_MAX_LAT, VERDUN_MIN_LON, VERDUN_MAX_LON)
-                || isInsideZone(latitude, longitude, PLATEAU_MIN_LAT, PLATEAU_MAX_LAT, PLATEAU_MIN_LON, PLATEAU_MAX_LON);
+                || isInsideZone(latitude, longitude, PLATEAU_MIN_LAT, PLATEAU_MAX_LAT, PLATEAU_MIN_LON,
+                        PLATEAU_MAX_LON);
     }
 
     private boolean isValidDropOffLocation(LocationDto location, VehicleReservation reservation) {
@@ -210,7 +215,8 @@ public class RentalLifecycleService {
 
     private boolean isNearReservationDestination(LocationDto location, Location reservationDestination) {
         return Math.abs(location.latitude() - reservationDestination.latitude()) <= RESERVATION_DESTINATION_TOLERANCE
-                && Math.abs(location.longitude() - reservationDestination.longitude()) <= RESERVATION_DESTINATION_TOLERANCE;
+                && Math.abs(
+                        location.longitude() - reservationDestination.longitude()) <= RESERVATION_DESTINATION_TOLERANCE;
     }
 
     private boolean isInsideZone(
@@ -235,7 +241,6 @@ public class RentalLifecycleService {
                 trip.getStartTime(),
                 trip.getEndTime(),
                 trip.getTotalDurationMinutes(),
-                vehicleStatus.name()
-        );
+                vehicleStatus.name());
     }
 }
