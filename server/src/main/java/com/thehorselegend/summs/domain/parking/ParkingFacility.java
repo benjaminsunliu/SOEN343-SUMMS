@@ -29,6 +29,11 @@ public class ParkingFacility {
     private Double rating;
     private Integer totalSpots;
 
+    private Long providerId;
+
+    @Builder.Default
+    private Boolean active = Boolean.TRUE;
+
     // Amenity flags
     private Boolean covered;
     private Boolean openTwentyFourHours;

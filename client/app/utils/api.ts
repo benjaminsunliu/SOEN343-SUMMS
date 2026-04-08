@@ -57,6 +57,8 @@ export interface ParkingFacility {
   name:               string;
   address:            string;
   city:               string;
+  latitude?:          number;
+  longitude?:         number;
   distanceKm:         number;
   pricePerHour:       number;
   estimatedTotal:     number;
@@ -94,6 +96,46 @@ export interface ParkingReservationResponse {
   totalCost:       number;
   status:          string;
   confirmedAt:     string;
+}
+
+export interface ParkingSpaceUpsertRequest {
+  name: string;
+  address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  pricePerHour: number;
+  rating: number;
+  totalSpots: number;
+  covered: boolean;
+  openTwentyFourHours: boolean;
+  evCharging: boolean;
+  security: boolean;
+}
+
+export interface ParkingSummary {
+  totalFacilities: number;
+  totalSpots: number;
+  availableSpots: number;
+  reservedSpots: number;
+}
+
+export interface ParkingCatalogEntry {
+  terrainCode: string;
+  name: string;
+  address: string;
+  city: string;
+  latitude: number;
+  longitude: number;
+  pricePerHour: number;
+  rating: number;
+  totalSpots: number;
+  covered: boolean;
+  openTwentyFourHours: boolean;
+  evCharging: boolean;
+  security: boolean;
+  added: boolean;
+  addedFacilityId: number | null;
 }
 
 //Parking API calls
@@ -157,6 +199,93 @@ export async function cancelParkingReservation(reservationId: number): Promise<v
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message ?? "Could not cancel parking reservation");
   }
+}
+
+export async function listParkingSpacesForProvider(): Promise<ParkingFacility[]> {
+  const res = await apiFetch("/api/parking/management/spaces");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load parking spaces");
+  }
+
+  return res.json();
+}
+
+export async function listParkingCatalogForProvider(): Promise<ParkingCatalogEntry[]> {
+  const res = await apiFetch("/api/parking/management/catalog");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load parking catalog");
+  }
+
+  return res.json();
+}
+
+export async function addParkingCatalogEntryForProvider(terrainCode: string): Promise<ParkingFacility> {
+  const res = await apiFetch(`/api/parking/management/catalog/${encodeURIComponent(terrainCode)}/add`, {
+    method: "POST",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to add parking space from catalog");
+  }
+
+  return res.json();
+}
+
+export async function createParkingSpaceForProvider(
+  payload: ParkingSpaceUpsertRequest,
+): Promise<ParkingFacility> {
+  const res = await apiFetch("/api/parking/management/spaces", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to create parking space");
+  }
+
+  return res.json();
+}
+
+export async function updateParkingSpaceForProvider(
+  facilityId: number,
+  payload: ParkingSpaceUpsertRequest,
+): Promise<ParkingFacility> {
+  const res = await apiFetch(`/api/parking/management/spaces/${facilityId}`, {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to update parking space");
+  }
+
+  return res.json();
+}
+
+export async function deleteParkingSpaceForProvider(facilityId: number): Promise<void> {
+  const res = await apiFetch(`/api/parking/management/spaces/${facilityId}`, {
+    method: "DELETE",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to delete parking space");
+  }
+}
+
+export async function fetchParkingSummary(): Promise<ParkingSummary> {
+  const res = await apiFetch("/api/parking/summary");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load parking summary");
+  }
+
+  return res.json();
 }
 
 //Transit types

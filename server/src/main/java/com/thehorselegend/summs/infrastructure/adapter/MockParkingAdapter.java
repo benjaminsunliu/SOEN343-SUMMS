@@ -5,14 +5,12 @@ import com.thehorselegend.summs.api.dto.ParkingSearchRequestDTO;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
-@Primary
 @RequiredArgsConstructor  
 public class MockParkingAdapter implements IParkingService {
 

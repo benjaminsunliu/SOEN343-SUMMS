@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   apiFetch,
+  fetchParkingSummary,
   listParkingReservations,
+  type ParkingSummary,
   type ParkingReservationResponse,
 } from "../utils/api";
 import { getAuthUser } from "../utils/auth";
@@ -64,6 +66,7 @@ export default function DashboardPage() {
   const [activeReservations, setActiveReservations] = useState<number | null>(null);
   const [reservations, setReservations] = useState<BookingSummary[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTripSummary | null>(null);
+  const [parkingSummary, setParkingSummary] = useState<ParkingSummary | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -202,6 +205,30 @@ export default function DashboardPage() {
   }, [authUser]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadParkingSummary() {
+      try {
+        const summary = await fetchParkingSummary();
+        if (!isMounted) {
+          return;
+        }
+        setParkingSummary(summary);
+      } catch {
+        if (isMounted) {
+          setParkingSummary(null);
+        }
+      }
+    }
+
+    void loadParkingSummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     // Get browser location
     let isMounted = true;
 
@@ -335,7 +362,11 @@ export default function DashboardPage() {
       value: String(availableVehicles.length),
       valueClass: "text-blue-500",
     },
-    { label: "Free Parking Spots", value: "382", valueClass: "text-orange-400" },
+    {
+      label: "Free Parking Spots",
+      value: parkingSummary ? String(parkingSummary.availableSpots) : "--",
+      valueClass: "text-orange-400",
+    },
     { label: "CO2 Saved Today", value: "2.4+", valueClass: "text-violet-400" },
   ];
 

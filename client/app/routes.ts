@@ -15,6 +15,7 @@ export default [
 		route("trips/summary/:tripId", "routes/trip-summary.tsx"),
 		route("provider/vehicles", "routes/provider-vehicles.tsx"),
 		route("provider/operations", "routes/provider-operations.tsx"),
+		route("provider/parking", "routes/provider-parking.tsx"),
 		route("services/parking", "routes/parking.tsx"),
 		route("services/parking/confirm", "routes/parking-confirmation.tsx"),
 		route("services/public-transport", "routes/public-transport.tsx"),
