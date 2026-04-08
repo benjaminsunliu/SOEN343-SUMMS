@@ -25,7 +25,6 @@ public class TransitSearchLogEntity {
     private String date;              // requested travel date
     private String time;              // requested departure time
     private Integer resultsReturned;  // how many routes came back
-    private Long userId;              // who searched (nullable for anonymous)
 
     @Column(nullable = false)
     private LocalDateTime searchedAt;
