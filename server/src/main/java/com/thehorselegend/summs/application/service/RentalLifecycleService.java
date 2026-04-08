@@ -10,6 +10,7 @@ import com.thehorselegend.summs.domain.trip.Trip;
 import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
+import com.thehorselegend.summs.domain.vehicle.VehicleType;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
 import com.thehorselegend.summs.infrastructure.persistence.TripMapper;
@@ -46,14 +47,17 @@ public class RentalLifecycleService {
     private final TripRepository tripRepository;
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
+    private final Co2EmissionsService co2EmissionsService;
 
     public RentalLifecycleService(
             TripRepository tripRepository,
             VehicleRepository vehicleRepository,
-            ReservationRepository reservationRepository) {
+            ReservationRepository reservationRepository,
+            Co2EmissionsService co2EmissionsService) {
         this.tripRepository = tripRepository;
         this.vehicleRepository = vehicleRepository;
         this.reservationRepository = reservationRepository;
+        this.co2EmissionsService = co2EmissionsService;
     }
 
     @Transactional
@@ -123,13 +127,54 @@ public class RentalLifecycleService {
         if (endedInValidZone) {
             reservation.setEndLocation(actualDropOffLocation);
         }
+        
+        // Calculate CO₂ emissions saved ONLY for sustainable vehicles (bikes and scooters)
+        Double co2Saved = 0.0;
+        System.out.println("DEBUG: Vehicle Type = " + vehicle.getType() + " (VehicleType.BICYCLE=" + VehicleType.BICYCLE + ", VehicleType.SCOOTER=" + VehicleType.SCOOTER + ")");
+        System.out.println("DEBUG: Comparing vehicle.getType() == VehicleType.BICYCLE: " + (vehicle.getType() == VehicleType.BICYCLE));
+        System.out.println("DEBUG: Comparing vehicle.getType() == VehicleType.SCOOTER: " + (vehicle.getType() == VehicleType.SCOOTER));
+        
+        if (vehicle.getType() == VehicleType.BICYCLE || vehicle.getType() == VehicleType.SCOOTER) {
+            System.out.println("DEBUG: Vehicle is sustainable (BICYCLE or SCOOTER) - calculating CO₂");
+            // Only calculate CO₂ for sustainable mobility options
+            if (reservation.getStartLocation() != null) {
+                System.out.println("DEBUG: Start location exists - calculating distance");
+                co2Saved = co2EmissionsService.calculateCo2Saved(
+                        reservation.getStartLocation().latitude(),
+                        reservation.getStartLocation().longitude(),
+                        actualDropOffLocation.latitude(),
+                        actualDropOffLocation.longitude()
+                );
+                System.out.println("DEBUG: CO₂ Calculated = " + co2Saved + " kg");
+            } else {
+                // Log warning if start location is missing
+                System.err.println("WARNING: Start location is null for trip " + tripId + 
+                        ". Using default CO₂ value of 0.0");
+            }
+        } else {
+            System.out.println("DEBUG: Vehicle is NOT sustainable (CAR) - not calculating CO₂, setting to 0.0");
+            co2Saved = 0.0;
+        }
+        
         trip.complete(SummsTime.now());
         reservation.complete();
         reservationRepository.save(ReservationMapper.toEntity(reservation));
 
         vehicle.release(actualDropOffLocation);
 
-        Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(trip)));
+        // Create a new Trip with CO₂ data to persist
+        Trip tripWithCo2 = new Trip(
+                trip.getId(),
+                trip.getReservationId(),
+                trip.getVehicleId(),
+                trip.getCitizenId(),
+                trip.getStartTime(),
+                trip.getEndTime(),
+                trip.getTotalDurationMinutes(),
+                co2Saved
+        );
+
+        Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(tripWithCo2)));
         vehicleRepository.save(VehicleMapper.toEntity(vehicle));
 
         return toResponse(savedTrip, vehicle.getStatus());
@@ -235,7 +280,8 @@ public class RentalLifecycleService {
                 trip.getStartTime(),
                 trip.getEndTime(),
                 trip.getTotalDurationMinutes(),
-                vehicleStatus.name()
+                vehicleStatus.name(),
+                trip.getCo2SavedKg()
         );
     }
 }

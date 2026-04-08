@@ -82,6 +82,8 @@ export default function DashboardPage() {
   const [isLoadingWeather, setIsLoadingWeather] = useState(false);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
+  const [userCo2Saved, setUserCo2Saved] = useState<number | null>(null);
+  const [isLoadingCo2, setIsLoadingCo2] = useState(false);
 
   useEffect(() => {
     // Fetch vehicles
@@ -276,6 +278,41 @@ export default function DashboardPage() {
     };
   }, [authUser]);
 
+  useEffect(() => {
+    // Fetch global CO₂ savings (all users combined)
+    let isMounted = true;
+
+    async function loadGlobalCo2() {
+      try {
+        setIsLoadingCo2(true);
+        const response = await apiFetch(`/api/analytics/co2/global`);
+
+        if (!response.ok) {
+          throw new Error("Failed to load global CO₂ data");
+        }
+
+        const data = (await response.json()) as { totalCo2SavedKg: number };
+        if (isMounted) {
+          setUserCo2Saved(data.totalCo2SavedKg);
+        }
+      } catch {
+        if (isMounted) {
+          setUserCo2Saved(0);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCo2(false);
+        }
+      }
+    }
+
+    void loadGlobalCo2();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const mapMarkers: MapMarker[] = useMemo(() => {
     const vehicleMarkers = availableVehicles
       .filter(
@@ -336,7 +373,11 @@ export default function DashboardPage() {
       valueClass: "text-blue-500",
     },
     { label: "Free Parking Spots", value: "382", valueClass: "text-orange-400" },
-    { label: "CO2 Saved Today", value: "2.4+", valueClass: "text-violet-400" },
+    {
+      label: "System CO₂ Saved",
+      value: isLoadingCo2 ? "..." : `${(userCo2Saved ?? 0).toFixed(1)} kg`,
+      valueClass: "text-green-400",
+    },
   ];
 
   const quickActions = [
