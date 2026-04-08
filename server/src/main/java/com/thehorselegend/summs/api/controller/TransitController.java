@@ -4,18 +4,22 @@ import com.thehorselegend.summs.api.dto.TransitLineStatusDTO;
 import com.thehorselegend.summs.api.dto.TransitRouteDTO;
 import com.thehorselegend.summs.api.dto.TransitSearchRequestDTO;
 import com.thehorselegend.summs.application.service.transit.TransitSearchService;
+import com.thehorselegend.summs.infrastructure.persistence.TransitSearchLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/transit")
 @RequiredArgsConstructor
 public class TransitController {
     private final TransitSearchService transitSearchService;
+    private final TransitSearchLogRepository searchLogRepository;
 
     /**
      * GET /api/transit/routes
@@ -48,5 +52,30 @@ public class TransitController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<TransitLineStatusDTO>> getLineStatuses() {
         return ResponseEntity.ok(transitSearchService.getLineStatuses());
+    }
+
+    /**
+     * GET /api/transit/analytics
+     * Returns analytics data for transit searches.
+     */
+    @GetMapping("/analytics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> getTransitAnalytics() {
+        Map<String, Object> analytics = new LinkedHashMap<>();
+
+        analytics.put("totalSearches",    searchLogRepository.count());
+        analytics.put("topOrigins",       searchLogRepository.findTopOrigins().stream()
+            .limit(5)
+            .map(r -> Map.of("origin", r[0], "count", r[1]))
+            .collect(java.util.stream.Collectors.toList()));
+        analytics.put("topDestinations",  searchLogRepository.findTopDestinations().stream()
+            .limit(5)
+            .map(r -> Map.of("destination", r[0], "count", r[1]))
+            .collect(java.util.stream.Collectors.toList()));
+        analytics.put("searchesByType",   searchLogRepository.findSearchesByType().stream()
+            .map(r -> Map.of("type", r[0], "count", r[1]))
+            .collect(java.util.stream.Collectors.toList()));
+
+        return ResponseEntity.ok(analytics);
     }
 }
