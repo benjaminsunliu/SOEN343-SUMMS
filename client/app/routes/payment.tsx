@@ -83,10 +83,8 @@ export default function PaymentPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [paypalPassword, setPaypalPassword] = useState("");
 
-  const [includeServiceFee, setIncludeServiceFee] = useState(true);
   const [serviceFeeAmount, setServiceFeeAmount] = useState(2.50);
 
-  const [includeTax, setIncludeTax] = useState(true);
   const [taxRate, setTaxRate] = useState(0.15);
 
   const [includeInsuranceFee, setIncludeInsuranceFee] = useState(false);
@@ -104,6 +102,9 @@ export default function PaymentPage() {
   } | null>(null);
   const [transactions, setTransactions] = useState<PaymentTransactionHistoryItem[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+
+  const includeServiceFee = true;
+  const includeTax = true;
 
   const loadTransactionHistory = async () => {
     setIsLoadingTransactions(true);
@@ -193,12 +194,8 @@ export default function PaymentPage() {
   const estimatedAmount = useMemo(() => {
     let amount = baseAmount;
 
-    if (includeServiceFee) {
-      amount += serviceFeeAmount;
-    }
-    if (includeTax) {
-      amount *= 1 + taxRate;
-    }
+    amount += serviceFeeAmount;
+    amount *= 1 + taxRate;
     if (includeInsuranceFee) {
       amount += insuranceFeeAmount;
     }
@@ -209,9 +206,7 @@ export default function PaymentPage() {
     return amount;
   }, [
     baseAmount,
-    includeServiceFee,
     serviceFeeAmount,
-    includeTax,
     taxRate,
     includeInsuranceFee,
     insuranceFeeAmount,
@@ -471,21 +466,19 @@ export default function PaymentPage() {
 
                 <FeeRow
                   label="Service Fee"
-                  checked={includeServiceFee}
-                  onCheckedChange={setIncludeServiceFee}
                   amount={serviceFeeAmount}
                   onAmountChange={setServiceFeeAmount}
                   step={0.1}
+                  required
                 />
 
                 <FeeRow
                   label="Tax Rate"
-                  checked={includeTax}
-                  onCheckedChange={setIncludeTax}
                   amount={taxRate}
                   onAmountChange={setTaxRate}
                   step={0.01}
                   hint="Use decimal format (0.15 = 15%)."
+                  required
                 />
 
                 <FeeRow
@@ -571,34 +564,43 @@ export default function PaymentPage() {
 
 interface FeeRowProps {
   label: string;
-  checked: boolean;
-  onCheckedChange: (value: boolean) => void;
   amount: number;
   onAmountChange: (value: number) => void;
   step: number;
   hint?: string;
+  required?: boolean;
+  checked?: boolean;
+  onCheckedChange?: (value: boolean) => void;
 }
 
 function FeeRow({
   label,
-  checked,
-  onCheckedChange,
   amount,
   onAmountChange,
   step,
   hint,
+  required = false,
+  checked = true,
+  onCheckedChange,
 }: FeeRowProps) {
   return (
     <div className="rounded-lg border border-[#2d3d57] bg-[#101d34] px-3 py-2">
       <div className="flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-200">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(event) => onCheckedChange(event.target.checked)}
-          />
-          {label}
-        </label>
+        {required ? (
+          <div className="text-sm text-gray-200">
+            {label}
+            <span className="ml-2 text-xs uppercase tracking-wide text-cyan-300">Required</span>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(event) => onCheckedChange?.(event.target.checked)}
+            />
+            {label}
+          </label>
+        )}
 
         <input
           type="number"
@@ -606,7 +608,7 @@ function FeeRow({
           step={step}
           value={amount}
           onChange={(event) => onAmountChange(parseNonNegativeNumber(event.target.value))}
-          disabled={!checked}
+          disabled={!required && !checked}
           className="w-28 rounded-md border border-[#2d3d57] bg-[#071229] px-2 py-1 text-sm text-white disabled:opacity-60"
         />
       </div>

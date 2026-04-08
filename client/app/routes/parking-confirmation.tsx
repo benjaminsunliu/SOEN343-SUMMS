@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import type { Route } from "./+types/parking-confirmation";
 import {
@@ -11,11 +11,14 @@ export function meta({}: Route.MetaArgs) {
   return [{ title: "Confirm Parking | SUMMS" }];
 }
 
-type PaymentMethod = "CREDIT" | "DEBIT" | "CREDITS";
+type PaymentMethod = "CREDIT_CARD" | "PAYPAL" | "WALLET";
 
 interface LocationState {
   facility: ParkingFacility;
   durationHours: number;
+  arrivalDate: string;
+  arrivalTime: string;
+  city: string;
 }
 
 function SummaryRow({
@@ -28,13 +31,13 @@ function SummaryRow({
   accent?: boolean;
 }) {
   return (
-    <div className="flex justify-between items-center py-1.5">
+    <div className="flex justify-between items-center py-1.5 gap-3">
       <span className="text-gray-400 text-sm">{label}</span>
       <span
         className={
           accent
-            ? "text-cyan-400 font-bold text-base"
-            : "text-white text-sm font-medium"
+            ? "text-cyan-400 font-bold text-base text-right"
+            : "text-white text-sm font-medium text-right"
         }
       >
         {value}
@@ -48,7 +51,6 @@ function PaymentMethodBtn({
   selected,
   onSelect,
 }: {
-  method: PaymentMethod;
   label: string;
   selected: boolean;
   onSelect: () => void;
@@ -108,7 +110,7 @@ function SuccessScreen({
         <div className="border-t border-gray-700 mt-2 pt-2">
           <SummaryRow
             label="Total Paid"
-            value={`$${reservation.totalCost?.toFixed(2)}`}
+            value={formatMoney(reservation.totalCost)}
             accent
           />
         </div>
@@ -128,62 +130,165 @@ function SuccessScreen({
   );
 }
 
+interface FeeRowProps {
+  label: string;
+  amount: number;
+  onAmountChange: (value: number) => void;
+  step: number;
+  hint?: string;
+  required?: boolean;
+  checked?: boolean;
+  onCheckedChange?: (value: boolean) => void;
+}
+
+function FeeRow({
+  label,
+  amount,
+  onAmountChange,
+  step,
+  hint,
+  required = false,
+  checked = true,
+  onCheckedChange,
+}: FeeRowProps) {
+  return (
+    <div className="rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-3">
+      <div className="flex items-center justify-between gap-3">
+        {required ? (
+          <div className="text-sm text-gray-200">
+            {label}
+            <span className="ml-2 text-xs uppercase tracking-wide text-cyan-300">Required</span>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(event) => onCheckedChange?.(event.target.checked)}
+            />
+            {label}
+          </label>
+        )}
+
+        <input
+          type="number"
+          min={0}
+          step={step}
+          value={amount}
+          onChange={(event) => onAmountChange(parseNonNegativeNumber(event.target.value))}
+          disabled={!required && !checked}
+          className="w-28 rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-white disabled:opacity-60"
+        />
+      </div>
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+    </div>
+  );
+}
+
 export default function ParkingConfirmationPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const state = location.state as LocationState | null;
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CREDIT");
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry] = useState("");
-  const [cvv, setCvv] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CREDIT_CARD");
+  const [creditCardNumber, setCreditCardNumber] = useState("");
+  const [paypalEmail, setPaypalEmail] = useState("");
+  const [paypalPassword, setPaypalPassword] = useState("");
+
+  const [serviceFeeAmount, setServiceFeeAmount] = useState(2.5);
+
+  const [taxRate, setTaxRate] = useState(0.15);
+
+  const [includeInsuranceFee, setIncludeInsuranceFee] = useState(false);
+  const [insuranceFeeAmount, setInsuranceFeeAmount] = useState(3.0);
+
+  const [includeDiscount, setIncludeDiscount] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(1.0);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<ParkingReservationResponse | null>(null);
 
-  const formatCardNumber = (val: string) =>
-    val
-      .replace(/\D/g, "")
-      .slice(0, 16)
-      .replace(/(.{4})/g, "$1 ")
-      .trim();
+  const includeServiceFee = true;
+  const includeTax = true;
 
-  const formatExpiry = (val: string) => {
-    const clean = val.replace(/\D/g, "").slice(0, 4);
-    return clean.length > 2 ? `${clean.slice(0, 2)}/${clean.slice(2)}` : clean;
-  };
-
-  const handleConfirm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (paymentMethod !== "CREDITS") {
-      if (cardNumber.replace(/\s/g, "").length < 16)
-        return setError("Please enter a valid 16-digit card number.");
-      if (expiry.length < 5)
-        return setError("Please enter a valid expiry date (MM/YY).");
-      if (cvv.length < 3)
-        return setError("Please enter a valid CVV.");
+  const baseAmount = useMemo(() => {
+    if (!state?.facility) {
+      return 0;
     }
 
-    if (!state?.facility) return;
+    return state.facility.estimatedTotal ?? state.facility.pricePerHour * state.durationHours;
+  }, [state]);
 
-    const { facility, durationHours } = state;
-    const estimatedTotal = facility.pricePerHour * durationHours;
+  const estimatedAmount = useMemo(() => {
+    let amount = baseAmount;
+
+    amount += serviceFeeAmount;
+    amount *= 1 + taxRate;
+    if (includeInsuranceFee) {
+      amount += insuranceFeeAmount;
+    }
+    if (includeDiscount) {
+      amount = Math.max(0, amount - discountAmount);
+    }
+
+    return amount;
+  }, [
+    baseAmount,
+    serviceFeeAmount,
+    taxRate,
+    includeInsuranceFee,
+    insuranceFeeAmount,
+    includeDiscount,
+    discountAmount,
+  ]);
+
+  const handleConfirm = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+
+    if (!state?.facility) {
+      setError("No parking facility selected.");
+      return;
+    }
+
+    if (paymentMethod === "CREDIT_CARD" && creditCardNumber.trim().length === 0) {
+      setError("Enter a credit card number.");
+      return;
+    }
+
+    if (
+      paymentMethod === "PAYPAL" &&
+      (paypalEmail.trim().length === 0 || paypalPassword.trim().length === 0)
+    ) {
+      setError("Enter your PayPal email and password.");
+      return;
+    }
 
     setSubmitting(true);
     try {
       const response = await createParkingReservation({
-        facilityId: facility.facilityId,
-        facilityName: facility.name,
-        facilityAddress: facility.address,
-        city: facility.city,
-        arrivalDate: new Date().toISOString().split("T")[0],
-        arrivalTime: "14:00",
-        durationHours,
-        totalCost: estimatedTotal,
+        facilityId: state.facility.facilityId,
+        facilityName: state.facility.name,
+        facilityAddress: state.facility.address,
+        city: state.city || state.facility.city,
+        arrivalDate: state.arrivalDate,
+        arrivalTime: state.arrivalTime,
+        durationHours: state.durationHours,
+        totalCost: baseAmount,
         paymentMethod,
+        creditCardNumber: creditCardNumber.trim(),
+        paypalEmail: paypalEmail.trim(),
+        paypalPassword: paypalPassword.trim(),
+        includeServiceFee,
+        serviceFeeAmount,
+        includeTax,
+        taxRate,
+        includeInsuranceFee,
+        insuranceFeeAmount,
+        includeDiscount,
+        discountAmount,
       });
       setConfirmed(response);
     } catch (err) {
@@ -195,7 +300,6 @@ export default function ParkingConfirmationPage() {
     }
   };
 
-  // Guard — no state means user navigated here directly
   if (!state?.facility) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-20">
@@ -210,10 +314,8 @@ export default function ParkingConfirmationPage() {
     );
   }
 
-  const { facility, durationHours } = state;
-  const estimatedTotal = facility.pricePerHour * durationHours;
+  const { facility, durationHours, arrivalDate, arrivalTime } = state;
 
-  // Success screen
   if (confirmed) {
     return (
       <div className="flex flex-col h-full bg-gray-900 overflow-y-auto">
@@ -225,11 +327,8 @@ export default function ParkingConfirmationPage() {
     );
   }
 
-  // Confirmation + payment form
   return (
     <div className="flex flex-col h-full bg-gray-900 overflow-hidden">
-
-      {/* Header */}
       <div className="px-7 py-5 border-b border-gray-800 flex items-center gap-3 shrink-0">
         <button
           onClick={() => navigate("/services/parking")}
@@ -241,10 +340,7 @@ export default function ParkingConfirmationPage() {
         <h1 className="text-xl font-bold text-white">Confirm Parking Reservation</h1>
       </div>
 
-      {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-
-        {/* LEFT — Summary */}
         <aside className="w-80 shrink-0 p-6 border-r border-gray-800 overflow-y-auto">
           <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
             <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-4">
@@ -256,27 +352,32 @@ export default function ParkingConfirmationPage() {
                 className="w-10 h-10 rounded-lg bg-cyan-500/15 border border-cyan-500/30
                             flex items-center justify-center text-xl shrink-0"
               >
-                🅿️
+                P
               </div>
               <div>
                 <p className="text-white font-bold text-sm leading-tight">{facility.name}</p>
-                <p className="text-gray-400 text-xs mt-0.5">📍 {facility.address}</p>
+                <p className="text-gray-400 text-xs mt-0.5">{facility.address}</p>
               </div>
             </div>
 
             <div className="space-y-0.5">
-              <SummaryRow label="Rate" value={`$${facility.pricePerHour?.toFixed(2)}/hr`} />
+              <SummaryRow label="Rate" value={`${formatMoney(facility.pricePerHour)}/hr`} />
+              <SummaryRow
+                label="Arrival"
+                value={formatArrivalDateTime(arrivalDate, arrivalTime)}
+              />
               <SummaryRow
                 label="Duration"
                 value={`${durationHours} hour${durationHours !== 1 ? "s" : ""}`}
               />
               <SummaryRow label="Spots Available" value={String(facility.availableSpots)} />
+              <SummaryRow label="Base Parking Cost" value={formatMoney(baseAmount)} />
             </div>
 
             <div className="border-t border-gray-700 mt-3 pt-3">
               <SummaryRow
-                label="Estimated Total"
-                value={`$${estimatedTotal.toFixed(2)}`}
+                label="Estimated Final"
+                value={formatMoney(estimatedAmount)}
                 accent
               />
             </div>
@@ -306,94 +407,115 @@ export default function ParkingConfirmationPage() {
           </div>
         </aside>
 
-        {/* RIGHT — Payment */}
         <main className="flex-1 overflow-y-auto p-6">
-          <form onSubmit={handleConfirm} className="max-w-md">
+          <form onSubmit={(event) => void handleConfirm(event)} className="max-w-md">
             <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide mb-3">
               Payment Method
             </p>
             <div className="flex gap-2 mb-6">
               {(
                 [
-                  ["CREDIT", "💳 Credit Card"],
-                  ["DEBIT", "🏦 Debit Card"],
-                  ["CREDITS", "⭐ SUMMS Credits"],
+                  ["CREDIT_CARD", "Credit Card"],
+                  ["PAYPAL", "PayPal"],
+                  ["WALLET", "Wallet"],
                 ] as [PaymentMethod, string][]
-              ).map(([m, label]) => (
+              ).map(([method, label]) => (
                 <PaymentMethodBtn
-                  key={m}
-                  method={m}
+                  key={method}
                   label={label}
-                  selected={paymentMethod === m}
-                  onSelect={() => setPaymentMethod(m)}
+                  selected={paymentMethod === method}
+                  onSelect={() => setPaymentMethod(method)}
                 />
               ))}
             </div>
 
-            {paymentMethod !== "CREDITS" && (
-              <div className="space-y-4 mb-6">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
-                    Card Number
-                  </label>
+            {paymentMethod === "CREDIT_CARD" && (
+              <div className="space-y-3 rounded-xl border border-gray-700 bg-gray-800/60 p-4 mb-6">
+                <label className="block text-sm text-gray-200">
+                  Credit Card Number
                   <input
                     type="text"
-                    inputMode="numeric"
-                    placeholder="•••• •••• •••• ••••"
-                    value={cardNumber}
-                    onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
-                    className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5
-                               text-white text-sm placeholder-gray-600 tracking-widest
-                               focus:outline-none focus:border-cyan-500 transition-colors"
+                    value={creditCardNumber}
+                    onChange={(event) => setCreditCardNumber(event.target.value)}
+                    placeholder="12345678"
+                    className="mt-1 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-white"
                   />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
-                      Expiry
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="MM/YY"
-                      value={expiry}
-                      onChange={(e) => setExpiry(formatExpiry(e.target.value))}
-                      className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5
-                                 text-white text-sm placeholder-gray-600
-                                 focus:outline-none focus:border-cyan-500 transition-colors"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-gray-400 text-xs font-semibold uppercase tracking-wide">
-                      CVV
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="•••"
-                      maxLength={4}
-                      value={cvv}
-                      onChange={(e) => setCvv(e.target.value.replace(/\D/g, ""))}
-                      className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5
-                                 text-white text-sm placeholder-gray-600
-                                 focus:outline-none focus:border-cyan-500 transition-colors"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === "CREDITS" && (
-              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-6">
-                <p className="text-cyan-400 text-sm">
-                  ⭐ SUMMS Credits will be deducted from your balance on confirmation.
+                </label>
+                <p className="text-xs text-gray-400">
+                  Test card for success: 12345678
                 </p>
               </div>
             )}
 
-            <div className="flex items-center gap-2 mb-6 text-gray-500 text-xs">
-              <span>🔒</span>
-              <span>Payment secured · Card details are not stored</span>
+            {paymentMethod === "PAYPAL" && (
+              <div className="space-y-3 rounded-xl border border-gray-700 bg-gray-800/60 p-4 mb-6">
+                <label className="block text-sm text-gray-200">
+                  PayPal Email
+                  <input
+                    type="email"
+                    value={paypalEmail}
+                    onChange={(event) => setPaypalEmail(event.target.value)}
+                    placeholder="payment@test.com"
+                    className="mt-1 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                  />
+                </label>
+                <label className="block text-sm text-gray-200">
+                  PayPal Password
+                  <input
+                    type="password"
+                    value={paypalPassword}
+                    onChange={(event) => setPaypalPassword(event.target.value)}
+                    placeholder="Test123"
+                    className="mt-1 w-full rounded-md border border-gray-700 bg-gray-900 px-3 py-2 text-white"
+                  />
+                </label>
+                <p className="text-xs text-gray-400">
+                  Test PayPal for success: payment@test.com / Test123
+                </p>
+              </div>
+            )}
+
+            {paymentMethod === "WALLET" && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 mb-6 text-sm text-amber-200">
+                Wallet is disabled in this simulation and will fail.
+              </div>
+            )}
+
+            <div className="space-y-3 mb-6">
+              <FeeRow
+                label="Service Fee"
+                amount={serviceFeeAmount}
+                onAmountChange={setServiceFeeAmount}
+                step={0.1}
+                required
+              />
+
+              <FeeRow
+                label="Tax Rate"
+                amount={taxRate}
+                onAmountChange={setTaxRate}
+                step={0.01}
+                hint="Use decimal format (0.15 = 15%)."
+                required
+              />
+
+              <FeeRow
+                label="Insurance Fee"
+                checked={includeInsuranceFee}
+                onCheckedChange={setIncludeInsuranceFee}
+                amount={insuranceFeeAmount}
+                onAmountChange={setInsuranceFeeAmount}
+                step={0.1}
+              />
+
+              <FeeRow
+                label="Discount"
+                checked={includeDiscount}
+                onCheckedChange={setIncludeDiscount}
+                amount={discountAmount}
+                onAmountChange={setDiscountAmount}
+                step={0.1}
+              />
             </div>
 
             {error && (
@@ -401,7 +523,7 @@ export default function ParkingConfirmationPage() {
                 className="flex items-center gap-2 bg-red-500/10 border border-red-500/30
                             rounded-xl p-3 mb-4 text-red-400 text-sm"
               >
-                <span>⚠️</span> {error}
+                <span>!</span> {error}
               </div>
             )}
 
@@ -413,8 +535,8 @@ export default function ParkingConfirmationPage() {
                          rounded-xl text-base transition-colors"
             >
               {submitting
-                ? "Processing…"
-                : `Pay $${estimatedTotal.toFixed(2)} & Confirm Booking`}
+                ? "Processing..."
+                : `Pay ${formatMoney(estimatedAmount)} & Confirm Booking`}
             </button>
 
             <button
@@ -423,7 +545,7 @@ export default function ParkingConfirmationPage() {
               className="w-full mt-3 text-gray-500 hover:text-gray-300 text-sm
                          transition-colors py-2"
             >
-              Cancel — go back to Parking
+              Cancel and go back to Parking
             </button>
           </form>
         </main>
@@ -432,4 +554,27 @@ export default function ParkingConfirmationPage() {
   );
 }
 
+function parseNonNegativeNumber(value: string): number {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
 
+  return parsed;
+}
+
+function formatMoney(amount: number | null | undefined): string {
+  return `$${(amount ?? 0).toFixed(2)}`;
+}
+
+function formatArrivalDateTime(arrivalDate: string, arrivalTime: string): string {
+  const parsed = new Date(`${arrivalDate}T${arrivalTime}`);
+  if (Number.isNaN(parsed.getTime())) {
+    return `${arrivalDate} at ${arrivalTime}`;
+  }
+
+  return parsed.toLocaleString([], {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}

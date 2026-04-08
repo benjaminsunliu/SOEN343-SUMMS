@@ -81,6 +81,17 @@ export interface CreateParkingReservationRequest {
   durationHours:   number;
   totalCost:       number;
   paymentMethod:   string;
+  creditCardNumber?: string;
+  paypalEmail?:     string;
+  paypalPassword?:  string;
+  includeServiceFee:boolean;
+  serviceFeeAmount: number;
+  includeTax:       boolean;
+  taxRate:          number;
+  includeInsuranceFee:boolean;
+  insuranceFeeAmount:number;
+  includeDiscount:  boolean;
+  discountAmount:   number;
 }
 
 export interface ParkingReservationResponse {

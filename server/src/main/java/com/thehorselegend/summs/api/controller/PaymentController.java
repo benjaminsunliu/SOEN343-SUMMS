@@ -73,9 +73,9 @@ public class PaymentController {
         }
 
         PaymentApplicationService.PaymentOptions options = new PaymentApplicationService.PaymentOptions(
-                request.includeServiceFee(),
+                true,
                 request.serviceFeeAmount(),
-                request.includeTax(),
+                true,
                 request.taxRate(),
                 request.includeInsuranceFee(),
                 request.insuranceFeeAmount(),
