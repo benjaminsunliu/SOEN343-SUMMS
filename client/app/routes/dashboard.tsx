@@ -390,12 +390,12 @@ export default function DashboardPage() {
   return (
     <>
       <SiteNav />
-      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
-        <header className="mb-3 border-b border-[#253047] pb-2.5">
+      <main className="flex flex-col min-h-screen bg-gray-900 px-5 py-4 text-white">
+        <header className="mb-3 border-b border-[#253047] pb-2.5 flex-shrink-0">
           <h1 className="text-xl font-bold tracking-tight">Dashboard</h1>
         </header>
 
-        <div className="mb-3 rounded-xl border border-amber-500/70 bg-amber-500/20 px-4 py-2.5 text-amber-300">
+        <div className="mb-3 rounded-xl border border-amber-500/70 bg-amber-500/20 px-4 py-2.5 text-amber-300 flex-shrink-0">
           <p className="text-lg font-semibold">
             {weather.description ?? "Weather"} Alert
           </p>
@@ -410,7 +410,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <section className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 flex-shrink-0">
           {statCards.map((card) => (
             <article key={card.label} className="rounded-xl border border-[#2a354a] bg-[#06142b] p-3.5">
               <p className="text-base text-gray-300">{card.label}</p>
@@ -419,7 +419,7 @@ export default function DashboardPage() {
           ))}
         </section>
 
-        <section className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mb-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4 flex-shrink-0">
           {quickActions.map((action) => (
             <button
               key={action.label}
@@ -432,11 +432,11 @@ export default function DashboardPage() {
           ))}
         </section>
 
-         <section className="grid gap-3 xl:grid-cols-[1.8fr_1fr]">
-           <article className="rounded-xl border border-[#2a354a] bg-black">
-             <h2 className="border-b border-[#2a354a] px-4 py-2.5 text-xl font-semibold">Live City Map</h2>
-             <div className="p-3.5">
-               <div className="relative h-56 overflow-hidden rounded-lg border border-[#1f2e49]">
+         <section className="flex-1 grid gap-3 xl:grid-cols-[1.8fr_1fr] min-h-0">
+           <article className="rounded-xl border border-[#2a354a] bg-black flex flex-col min-h-0">
+             <h2 className="border-b border-[#2a354a] px-4 py-2.5 text-xl font-semibold flex-shrink-0">Live City Map</h2>
+             <div className="p-3.5 flex flex-col flex-1 min-h-0">
+               <div className="relative flex-1 overflow-hidden rounded-lg border border-[#1f2e49]">
                  <MapView
                    center={mapCenter}
                    zoom={13}
@@ -466,7 +466,7 @@ export default function DashboardPage() {
                    </p>
                  )}
                </div>
-               <div className="mt-3 flex flex-wrap gap-2 text-sm">
+               <div className="mt-3 flex flex-wrap gap-2 text-sm flex-shrink-0">
                  <span className="rounded-md bg-black px-3 py-1 text-cyan-400">Bicycle: {vehiclesByType.bicycles}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-blue-500">Car: {vehiclesByType.cars}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-red-400">Scooter: {vehiclesByType.scooters}</span>
@@ -475,8 +475,8 @@ export default function DashboardPage() {
              </div>
            </article>
 
-          <div className="space-y-3">
-            <article className="rounded-xl border border-[#2a354a] bg-[#06142b] p-3.5">
+          <div className="space-y-3 flex flex-col min-h-0">
+            <article className="rounded-xl border border-[#2a354a] bg-[#06142b] p-3.5 flex-shrink-0">
               <p className="text-4xl font-bold">
                 {weather.temperature != null ? `${weather.temperature.toFixed(0)}°C` : "--"}
               </p>
@@ -500,8 +500,8 @@ export default function DashboardPage() {
               </p>
             </article>
 
-            <article className="rounded-xl border border-[#2a354a] bg-[#06142b]">
-              <div className="flex items-center justify-between border-b border-[#2a354a] px-4 py-2.5">
+            <article className="rounded-xl border border-[#2a354a] bg-[#06142b] flex flex-col flex-1 min-h-0">
+              <div className="flex items-center justify-between border-b border-[#2a354a] px-4 py-2.5 flex-shrink-0">
                 <h2 className="text-xl font-semibold">My Active Bookings</h2>
                 <button
                   type="button"
@@ -511,7 +511,7 @@ export default function DashboardPage() {
                   View All
                 </button>
               </div>
-              <div className="space-y-3 p-3.5">
+              <div className="space-y-3 p-3.5 flex-1 overflow-y-auto">
                 {isLoadingReservations ? (
                   <div className="rounded-lg border border-[#2b3b55] bg-[#14233d] px-3 py-2 text-sm text-gray-300">
                     Loading active bookings...
