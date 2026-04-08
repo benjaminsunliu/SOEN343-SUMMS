@@ -12,6 +12,10 @@ interface ProviderPaymentAnalytics {
   revenueByPaymentMethod: Record<string, number>;
 }
 
+interface GlobalCo2Analytics {
+  totalCo2SavedKg: number;
+}
+
 interface ProviderTransaction {
   id: number;
   reservationId: number;
@@ -35,6 +39,7 @@ export function meta({}: Route.MetaArgs) {
 export default function RentalAnalyticsPage() {
   const [analytics, setAnalytics] = useState<ProviderPaymentAnalytics | null>(null);
   const [transactions, setTransactions] = useState<ProviderTransaction[]>([]);
+  const [globalCo2, setGlobalCo2] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,9 +51,10 @@ export default function RentalAnalyticsPage() {
       setError(null);
 
       try {
-        const [analyticsResponse, transactionsResponse] = await Promise.all([
+        const [analyticsResponse, transactionsResponse, co2Response] = await Promise.all([
           apiFetch("/api/payments/transactions/analytics/provider/me"),
           apiFetch("/api/payments/transactions/provider/me"),
+          apiFetch("/api/analytics/co2/global"),
         ]);
 
         if (!analyticsResponse.ok) {
@@ -67,6 +73,14 @@ export default function RentalAnalyticsPage() {
 
         setAnalytics(analyticsData);
         setTransactions(transactionData ?? []);
+
+        // Load CO₂ data if available
+        if (co2Response.ok) {
+          const co2Data = (await co2Response.json()) as GlobalCo2Analytics;
+          setGlobalCo2(co2Data.totalCo2SavedKg);
+        } else {
+          setGlobalCo2(0);
+        }
       } catch (err) {
         if (!isMounted) {
           return;
@@ -74,6 +88,7 @@ export default function RentalAnalyticsPage() {
 
         setAnalytics(null);
         setTransactions([]);
+        setGlobalCo2(0);
         setError(err instanceof Error ? err.message : "Unable to load rental analytics.");
       } finally {
         if (isMounted) {
@@ -127,7 +142,7 @@ export default function RentalAnalyticsPage() {
                 <MetricCard label="Successful" value={String(analytics.successfulTransactions)} />
                 <MetricCard label="Failed" value={String(analytics.failedTransactions)} />
                 <MetricCard label="Total Revenue" value={`$${analytics.totalRevenue.toFixed(2)}`} />
-                <MetricCard label="Success Rate" value={`${analytics.successRatePercentage.toFixed(1)}%`} />
+                <MetricCard label="Global CO₂ Saved" value={`${(globalCo2 ?? 0).toFixed(1)} kg`} color="text-green-400" />
               </section>
 
               <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -231,13 +246,14 @@ export default function RentalAnalyticsPage() {
 interface MetricCardProps {
   label: string;
   value: string;
+  color?: string;
 }
 
-function MetricCard({ label, value }: MetricCardProps) {
+function MetricCard({ label, value, color = "text-cyan-300" }: MetricCardProps) {
   return (
     <div className="bg-gray-800 rounded-lg border border-gray-700 p-4">
       <p className="text-sm text-gray-400">{label}</p>
-      <p className="text-xl font-bold text-cyan-300 mt-2">{value}</p>
+      <p className={`text-xl font-bold ${color} mt-2`}>{value}</p>
     </div>
   );
 }
