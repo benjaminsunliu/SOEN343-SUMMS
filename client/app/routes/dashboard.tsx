@@ -374,7 +374,7 @@ export default function DashboardPage() {
     },
     { label: "Free Parking Spots", value: "382", valueClass: "text-orange-400" },
     {
-      label: "System CO₂ Saved",
+      label: "Total CO₂ Saved by Users",
       value: isLoadingCo2 ? "..." : `${(userCo2Saved ?? 0).toFixed(1)} kg`,
       valueClass: "text-green-400",
     },
