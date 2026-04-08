@@ -28,7 +28,7 @@ public class TransitController {
             @RequestParam(required = false) String destination,
             @RequestParam(required = false) String date,
             @RequestParam(required = false) String time,
-            @RequestParam(defaultValue = "ALL")  String type) {
+            @RequestParam(defaultValue = "ALL") String type) {
 
         TransitSearchRequestDTO request = new TransitSearchRequestDTO();
         request.setOrigin(origin);
