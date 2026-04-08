@@ -92,7 +92,7 @@ public class RentalLifecycleService {
         Trip trip = Trip.start(reservation.getId(), vehicle.getId(), citizenId, SummsTime.now());
         Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(trip)));
 
-        return toResponse(savedTrip, vehicle.getStatus());
+        return toResponse(savedTrip, vehicle.getStatus(), vehicle.getType());
     }
 
     @Transactional
@@ -177,7 +177,7 @@ public class RentalLifecycleService {
         Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(tripWithCo2)));
         vehicleRepository.save(VehicleMapper.toEntity(vehicle));
 
-        return toResponse(savedTrip, vehicle.getStatus());
+        return toResponse(savedTrip, vehicle.getStatus(), vehicle.getType());
     }
 
     public TripResponse getTripById(Long tripId) {
@@ -189,7 +189,7 @@ public class RentalLifecycleService {
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        return toResponse(trip, vehicle.getStatus());
+        return toResponse(trip, vehicle.getStatus(), vehicle.getType());
     }
 
     public TripResponse getTripByReservationId(Long citizenId, Long reservationId) {
@@ -205,7 +205,7 @@ public class RentalLifecycleService {
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        return toResponse(trip, vehicle.getStatus());
+        return toResponse(trip, vehicle.getStatus(), vehicle.getType());
     }
 
     public TripResponse getActiveTripForCitizen(Long citizenId) {
@@ -217,7 +217,7 @@ public class RentalLifecycleService {
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        return toResponse(trip, vehicle.getStatus());
+        return toResponse(trip, vehicle.getStatus(), vehicle.getType());
     }
 
     private void validateReservation(VehicleReservation reservation, Long citizenId) {
@@ -271,7 +271,7 @@ public class RentalLifecycleService {
                 && longitude <= maxLon;
     }
 
-    private TripResponse toResponse(Trip trip, VehicleStatus vehicleStatus) {
+    private TripResponse toResponse(Trip trip, VehicleStatus vehicleStatus, VehicleType vehicleType) {
         return new TripResponse(
                 trip.getId(),
                 trip.getReservationId(),
@@ -281,7 +281,8 @@ public class RentalLifecycleService {
                 trip.getEndTime(),
                 trip.getTotalDurationMinutes(),
                 vehicleStatus.name(),
-                trip.getCo2SavedKg()
+                trip.getCo2SavedKg(),
+                vehicleType.name()
         );
     }
 }

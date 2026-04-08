@@ -16,6 +16,11 @@ interface PaymentTransactionHistoryItem {
   createdAt: string;
 }
 
+interface Co2SavingsData {
+  totalCo2SavedKg: number;
+  sustainableTripCount: number;
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Profile | SUMMS" },
@@ -31,7 +36,7 @@ export default function ProfilePage() {
   const [transactions, setTransactions] = useState<PaymentTransactionHistoryItem[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [transactionError, setTransactionError] = useState<string | null>(null);
-  const [userCo2Saved, setUserCo2Saved] = useState<number | null>(null);
+  const [co2Data, setCo2Data] = useState<Co2SavingsData | null>(null);
   const [isLoadingCo2, setIsLoadingCo2] = useState(false);
 
   useEffect(() => {
@@ -84,7 +89,7 @@ export default function ProfilePage() {
 
     async function loadUserCo2() {
       if (!authUser) {
-        setUserCo2Saved(null);
+        setCo2Data(null);
         return;
       }
 
@@ -96,13 +101,13 @@ export default function ProfilePage() {
           throw new Error("Failed to load CO₂ data");
         }
 
-        const data = (await response.json()) as { totalCo2SavedKg: number };
+        const data = (await response.json()) as Co2SavingsData;
         if (isMounted) {
-          setUserCo2Saved(data.totalCo2SavedKg);
+          setCo2Data(data);
         }
       } catch {
         if (isMounted) {
-          setUserCo2Saved(0);
+          setCo2Data({ totalCo2SavedKg: 0, sustainableTripCount: 0 });
         }
       } finally {
         if (isMounted) {
@@ -159,19 +164,19 @@ export default function ProfilePage() {
                     <div className="rounded-xl bg-green-900/20 px-4 py-3">
                       <p className="text-xs uppercase tracking-wider text-green-300">Total CO₂ Saved</p>
                       <p className="mt-2 text-3xl font-bold text-green-400">
-                        {(userCo2Saved ?? 0).toFixed(2)} <span className="text-lg">kg</span>
+                        {(co2Data?.totalCo2SavedKg ?? 0).toFixed(2)} <span className="text-lg">kg</span>
                       </p>
                       <p className="mt-1 text-xs text-green-300">
-                        Equivalent to {((userCo2Saved ?? 0) / 2.4).toFixed(1)} tree seedlings grown for 10 years
+                        Equivalent to {((co2Data?.totalCo2SavedKg ?? 0) / 2.4).toFixed(1)} tree seedlings grown for 10 years
                       </p>
                     </div>
                     <div className="rounded-xl bg-blue-900/20 px-4 py-3">
                       <p className="text-xs uppercase tracking-wider text-blue-300">Sustainable Trips</p>
                       <p className="mt-2 text-3xl font-bold text-blue-400">
-                        {(userCo2Saved ?? 0) > 0 ? Math.ceil((userCo2Saved ?? 0) / 1.2) : 0}
+                        {co2Data?.sustainableTripCount ?? 0}
                       </p>
                       <p className="mt-1 text-xs text-blue-300">
-                        Average ~1.2 kg CO₂ saved per trip
+                        Average ~{co2Data && co2Data.sustainableTripCount > 0 ? (co2Data.totalCo2SavedKg / co2Data.sustainableTripCount).toFixed(2) : "0.00"} kg CO₂ saved per trip
                       </p>
                     </div>
                   </>

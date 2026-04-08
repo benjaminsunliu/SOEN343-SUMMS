@@ -18,4 +18,8 @@ public interface TripRepository extends JpaRepository<TripEntity, Long> {
     @Query("SELECT COALESCE(SUM(t.co2SavedKg), 0.0) FROM TripEntity t " +
             "WHERE t.co2SavedKg IS NOT NULL")
     Double sumCo2SavedGlobally();
+
+    @Query("SELECT COUNT(t) FROM TripEntity t " +
+            "WHERE t.citizenId = :citizenId AND t.co2SavedKg > 0.0 AND t.endTime IS NOT NULL")
+    Long countSustainableTripsByUserId(@Param("citizenId") Long citizenId);
 }

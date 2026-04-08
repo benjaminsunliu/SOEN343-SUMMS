@@ -20,6 +20,7 @@ interface TripSummaryResponse {
   totalDurationMinutes: number | null;
   vehicleStatus: string;
   co2SavedKg: number;
+  vehicleType: string;
 }
 
 export default function TripSummaryPage() {
@@ -125,17 +126,19 @@ export default function TripSummaryPage() {
                   <p className="font-bold text-cyan-400">{calculateEstimatedCost(trip.totalDurationMinutes)}</p>
                 </div>
 
-                <div className="border-y border-[#2d3d57] py-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-200">CO₂ Saved</span>
-                    <span className="text-2xl font-bold text-green-400">
-                      {trip.co2SavedKg.toFixed(2)} <span className="text-sm text-gray-400">kg</span>
-                    </span>
+                {trip.vehicleType !== "CAR" && (
+                  <div className="border-y border-[#2d3d57] py-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-200">CO₂ Saved</span>
+                      <span className="text-2xl font-bold text-green-400">
+                        {trip.co2SavedKg.toFixed(2)} <span className="text-sm text-gray-400">kg</span>
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Equivalent to taking a car off the road
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Equivalent to taking a car off the road
-                  </p>
-                </div>
+                )}
 
                 <div className="rounded-xl bg-[#1a2a45] px-4 py-3.5">
                   <p className="text-xs uppercase tracking-[0.2em] text-gray-400">Vehicle Status</p>

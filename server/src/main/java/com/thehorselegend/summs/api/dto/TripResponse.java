@@ -11,6 +11,7 @@ public record TripResponse(
         LocalDateTime endTime,
         Long totalDurationMinutes,
         String vehicleStatus,
-        Double co2SavedKg
+        Double co2SavedKg,
+        String vehicleType
 ) {
 }

@@ -27,10 +27,10 @@ public class Co2AnalyticsController {
 
     /**
      * GET /api/analytics/co2/user/{userId}
-     * Retrieve total CO₂ savings for a specific user.
+     * Retrieve total CO₂ savings and sustainable trip count for a specific user.
      *
      * @param userId the ID of the user
-     * @return the total CO₂ saved in kilograms
+     * @return the total CO₂ saved in kilograms and count of sustainable trips
      */
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasAnyRole('CITIZEN', 'PROVIDER', 'ADMIN')")
@@ -39,7 +39,11 @@ public class Co2AnalyticsController {
         if (totalCo2 == null) {
             totalCo2 = 0.0;
         }
-        return new Co2SavingsResponse(totalCo2);
+        Long sustainableTripCount = tripRepository.countSustainableTripsByUserId(userId);
+        if (sustainableTripCount == null) {
+            sustainableTripCount = 0L;
+        }
+        return new Co2SavingsResponse(totalCo2, sustainableTripCount);
     }
 
     /**
@@ -63,13 +67,24 @@ public class Co2AnalyticsController {
      */
     public static class Co2SavingsResponse {
         private final Double totalCo2SavedKg;
+        private final Long sustainableTripCount;
 
         public Co2SavingsResponse(Double totalCo2SavedKg) {
             this.totalCo2SavedKg = totalCo2SavedKg;
+            this.sustainableTripCount = 0L;
+        }
+
+        public Co2SavingsResponse(Double totalCo2SavedKg, Long sustainableTripCount) {
+            this.totalCo2SavedKg = totalCo2SavedKg;
+            this.sustainableTripCount = sustainableTripCount;
         }
 
         public Double getTotalCo2SavedKg() {
             return totalCo2SavedKg;
+        }
+
+        public Long getSustainableTripCount() {
+            return sustainableTripCount;
         }
     }
 }
