@@ -82,9 +82,9 @@ public class PaymentController {
 
                 PaymentApplicationService.PaymentOptions options = new PaymentApplicationService.PaymentOptions(
                                 true,
-                                request.serviceFeeAmount(),
+                                PaymentApplicationService.FIXED_SERVICE_FEE_AMOUNT,
                                 true,
-                                request.taxRate(),
+                                PaymentApplicationService.FIXED_TAX_RATE,
                                 request.includeInsuranceFee(),
                                 request.insuranceFeeAmount(),
                                 request.includeDiscount(),

@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class PaymentApplicationService {
+    public static final double FIXED_SERVICE_FEE_AMOUNT = 2.50;
+    public static final double FIXED_TAX_RATE = 0.15;
 
     private final Map<String, PaymentMethodStrategy> strategyByMethod;
 

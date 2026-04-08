@@ -110,7 +110,7 @@ class ParkingReservationServiceTest {
         );
 
         assertEquals(
-                "Credit card payment declined (use test card 12345678) | amount=18.0 | details=Base reservation payment + service fee + tax",
+                "Credit card payment declined (use test card 12345678) | amount=23.575 | details=Base reservation payment + service fee + tax",
                 exception.getMessage()
         );
         verify(parkingReservationRepository, never()).save(any(ParkingReservationEntity.class));

@@ -142,9 +142,9 @@ public class ParkingReservationService {
     private PaymentApplicationService.PaymentOptions buildPaymentOptions(CreateParkingReservationRequest request) {
         return new PaymentApplicationService.PaymentOptions(
                 true,
-                request.getServiceFeeAmount(),
+                PaymentApplicationService.FIXED_SERVICE_FEE_AMOUNT,
                 true,
-                request.getTaxRate(),
+                PaymentApplicationService.FIXED_TAX_RATE,
                 request.isIncludeInsuranceFee(),
                 request.getInsuranceFeeAmount(),
                 request.isIncludeDiscount(),

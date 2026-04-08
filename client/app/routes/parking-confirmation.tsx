@@ -7,6 +7,9 @@ import {
   type ParkingReservationResponse,
 } from "../utils/api";
 
+const FIXED_SERVICE_FEE_AMOUNT = 2.5;
+const FIXED_TAX_RATE = 0.15;
+
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Confirm Parking | SUMMS" }];
 }
@@ -133,12 +136,14 @@ function SuccessScreen({
 interface FeeRowProps {
   label: string;
   amount: number;
-  onAmountChange: (value: number) => void;
-  step: number;
+  onAmountChange?: (value: number) => void;
+  step?: number;
   hint?: string;
   required?: boolean;
   checked?: boolean;
   onCheckedChange?: (value: boolean) => void;
+  readOnly?: boolean;
+  displayValue?: string;
 }
 
 function FeeRow({
@@ -150,6 +155,8 @@ function FeeRow({
   required = false,
   checked = true,
   onCheckedChange,
+  readOnly = false,
+  displayValue,
 }: FeeRowProps) {
   return (
     <div className="rounded-lg border border-gray-700 bg-gray-800/60 px-3 py-3">
@@ -157,7 +164,9 @@ function FeeRow({
         {required ? (
           <div className="text-sm text-gray-200">
             {label}
-            <span className="ml-2 text-xs uppercase tracking-wide text-cyan-300">Required</span>
+            <span className="ml-2 text-xs uppercase tracking-wide text-cyan-300">
+              {readOnly ? "Fixed" : "Required"}
+            </span>
           </div>
         ) : (
           <label className="flex items-center gap-2 text-sm text-gray-200">
@@ -170,15 +179,21 @@ function FeeRow({
           </label>
         )}
 
-        <input
-          type="number"
-          min={0}
-          step={step}
-          value={amount}
-          onChange={(event) => onAmountChange(parseNonNegativeNumber(event.target.value))}
-          disabled={!required && !checked}
-          className="w-28 rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-white disabled:opacity-60"
-        />
+        {readOnly ? (
+          <span className="rounded-md border border-gray-700 bg-gray-900 px-3 py-1 text-sm font-medium text-cyan-200">
+            {displayValue ?? formatMoney(amount)}
+          </span>
+        ) : (
+          <input
+            type="number"
+            min={0}
+            step={step}
+            value={amount}
+            onChange={(event) => onAmountChange?.(parseNonNegativeNumber(event.target.value))}
+            disabled={!required && !checked}
+            className="w-28 rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-white disabled:opacity-60"
+          />
+        )}
       </div>
       {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
@@ -196,9 +211,8 @@ export default function ParkingConfirmationPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [paypalPassword, setPaypalPassword] = useState("");
 
-  const [serviceFeeAmount, setServiceFeeAmount] = useState(2.5);
-
-  const [taxRate, setTaxRate] = useState(0.15);
+  const serviceFeeAmount = FIXED_SERVICE_FEE_AMOUNT;
+  const taxRate = FIXED_TAX_RATE;
 
   const [includeInsuranceFee, setIncludeInsuranceFee] = useState(false);
   const [insuranceFeeAmount, setInsuranceFeeAmount] = useState(3.0);
@@ -485,18 +499,17 @@ export default function ParkingConfirmationPage() {
               <FeeRow
                 label="Service Fee"
                 amount={serviceFeeAmount}
-                onAmountChange={setServiceFeeAmount}
-                step={0.1}
                 required
+                readOnly
+                displayValue={formatMoney(serviceFeeAmount)}
               />
 
               <FeeRow
                 label="Tax Rate"
                 amount={taxRate}
-                onAmountChange={setTaxRate}
-                step={0.01}
-                hint="Use decimal format (0.15 = 15%)."
                 required
+                readOnly
+                displayValue={`${(taxRate * 100).toFixed(0)}%`}
               />
 
               <FeeRow
