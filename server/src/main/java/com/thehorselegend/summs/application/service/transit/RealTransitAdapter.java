@@ -20,7 +20,7 @@ public class RealTransitAdapter implements TransitService{
     private final StmApiProperties stmConfig;
     private final RestTemplate restTemplate;
 
-    // ── HTTP ──────────────────────────────────────────────────────────────────
+    //HTTP
 
     private HttpHeaders apiHeaders() {
         HttpHeaders headers = new HttpHeaders();
@@ -41,7 +41,7 @@ public class RealTransitAdapter implements TransitService{
         }
     }
 
-    // ── searchRoutes — not used, GoogleTransitAdapter is @Primary ─────────────
+    // searchRoutes (not userd since GoogleTransitAdapter is @Primary)
 
     @Override
     public List<TransitRouteDTO> searchRoutes(TransitSearchRequestDTO request) {
@@ -86,7 +86,7 @@ public class RealTransitAdapter implements TransitService{
         return new ArrayList<>(statusMap.values());
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // Helpers
 
     private String effectToStatus(int effect) {
         return switch (effect) {

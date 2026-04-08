@@ -33,7 +33,7 @@ public class GoogleTransitAdapter implements TransitService{
     private static final ZoneId MONTREAL_TZ = ZoneId.of("America/Montreal");
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    // ── searchRoutes ──────────────────────────────────────────────────────────
+    //search routes
 
     @Override
     @SuppressWarnings("unchecked")
@@ -155,9 +155,8 @@ public class GoogleTransitAdapter implements TransitService{
                         .build());
                 }
 
-                // Also add the full journey as a summary if multi-leg
+                //Add full journey as summary if multiple stops
                 if (results.isEmpty()) {
-                    // Fallback — add whole route as one entry
                     Map<String, Object> totalDuration =
                         (Map<String, Object>) leg.get("duration");
                     int totalMins = totalDuration != null
@@ -201,16 +200,15 @@ public class GoogleTransitAdapter implements TransitService{
         }
     }
 
-    // ── getLineStatuses — keep using STM mock/real data ───────────────────────
+    //getLineStatuses (using STM real data)
 
     @Override
     public List<TransitLineStatusDTO> getLineStatuses() {
-        // Keep returning the STM line statuses from mock/real adapter
-        // Google Maps does not provide line-level status
+        // Keep returning the STM line statuses from real adapter
         return defaultLineStatuses();
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    //helpers
 
     private long buildDepartureEpoch(String dateStr, String timeStr) {
         try {

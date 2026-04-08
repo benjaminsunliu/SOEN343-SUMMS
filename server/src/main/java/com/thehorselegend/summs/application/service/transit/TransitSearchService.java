@@ -3,7 +3,6 @@ package com.thehorselegend.summs.application.service.transit;
 import com.thehorselegend.summs.api.dto.TransitLineStatusDTO;
 import com.thehorselegend.summs.api.dto.TransitRouteDTO;
 import com.thehorselegend.summs.api.dto.TransitSearchRequestDTO;
-import com.thehorselegend.summs.application.service.transit.TransitService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
