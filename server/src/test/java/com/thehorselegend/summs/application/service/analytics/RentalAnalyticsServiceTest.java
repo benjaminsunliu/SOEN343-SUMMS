@@ -3,6 +3,8 @@ package com.thehorselegend.summs.application.service.analytics;
 import com.thehorselegend.summs.api.dto.RentalAnalyticsResponseDto;
 import com.thehorselegend.summs.application.mapper.RentalAnalyticsMetricMapper;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
+import com.thehorselegend.summs.infrastructure.persistence.VehicleReservationEntity;
+import com.thehorselegend.summs.infrastructure.persistence.LocationEmbeddable;
 import com.thehorselegend.summs.infrastructure.persistence.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -152,7 +154,7 @@ class RentalAnalyticsServiceTest {
 
     // Helper method
     private ReservationEntity createMockReservation(Long id, Long vehicleId, ReservationStatus status) {
-        ReservationEntity reservation = new ReservationEntity();
+        VehicleReservationEntity reservation = new VehicleReservationEntity();
         reservation.setId(id);
         reservation.setReservableId(vehicleId);
         reservation.setStatus(status);
@@ -160,6 +162,8 @@ class RentalAnalyticsServiceTest {
         reservation.setStartDate(LocalDateTime.now());
         reservation.setEndDate(LocalDateTime.now().plusHours(1));
         reservation.setCity("Montreal");
+        reservation.setStartLocation(new LocationEmbeddable(45.5017, -73.5673));
+        reservation.setEndLocation(new LocationEmbeddable(45.5017, -73.5673));
         return reservation;
     }
 }

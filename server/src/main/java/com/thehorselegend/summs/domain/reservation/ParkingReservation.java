@@ -47,6 +47,11 @@ public class ParkingReservation extends Reservation {
         this.totalCost = totalCost;
     }
 
+    @Override
+    public ReservableType getReservableType() {
+        return ReservableType.PARKING;
+    }
+
     public String getFacilityName() {
         return facilityName;
     }

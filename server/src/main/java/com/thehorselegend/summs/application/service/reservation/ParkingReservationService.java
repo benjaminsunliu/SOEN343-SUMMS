@@ -1,4 +1,5 @@
-package com.thehorselegend.summs.application.service;
+package com.thehorselegend.summs.application.service.reservation;
+
 
 import com.thehorselegend.summs.api.dto.CreateParkingReservationRequest;
 import com.thehorselegend.summs.api.dto.ParkingReservationResponse;
@@ -22,36 +23,46 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ParkingReservationService {
-    private static final DateTimeFormatter CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+public class ParkingReservationService extends ReservationCreationTemplate<CreateParkingReservationRequest, ParkingReservation> {
 
+    private static final DateTimeFormatter CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     private final ParkingReservationRepository reservationRepository;
 
     @Transactional
     public ParkingReservationResponse createReservation(
             CreateParkingReservationRequest request,
-            Long userId) {
-
+            Long userId
+    ) {
         log.info("Creating parking reservation for facilityId={} userId={}",
                 request.getFacilityId(), userId);
 
-        ParkingReservation reservation = buildParkingReservation(request, userId);
+        LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
+        LocalDateTime endDate = startDate.plusHours(resolveDurationHours(request.getDurationHours()));
+
+        validateAvailability(request, startDate, endDate);
+        ParkingReservation reservation = buildReservation(request, userId, startDate, endDate);
         reservation.confirm();
 
-        ParkingReservationEntity saved = reservationRepository.save(
+        ParkingReservationEntity savedEntity = reservationRepository.save(
                 ParkingReservationMapper.toEntity(reservation)
         );
-        ParkingReservation savedReservation = ParkingReservationMapper.toDomain(saved);
 
-        log.info("Parking reservation created id={}", saved.getId());
+        ParkingReservation savedReservation = ParkingReservationMapper.toDomain(savedEntity);
 
-        return toResponse(savedReservation, saved.getCreatedAt());
+        log.info("Parking reservation created id={}", savedReservation.getId());
+
+        return toResponse(
+                savedReservation,
+                savedEntity.getCreatedAt() != null ? savedEntity.getCreatedAt() : LocalDateTime.now()
+        );
     }
 
     @Transactional(readOnly = true)
     public List<ParkingReservationResponse> getUserReservations(Long userId) {
         return reservationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(entity -> toResponse(ParkingReservationMapper.toDomain(entity), entity.getCreatedAt()))
+                .map(ParkingReservationMapper::toDomain)
+                .map(reservation -> toResponse(reservation, LocalDateTime.now()))
                 .toList();
     }
 
@@ -60,21 +71,30 @@ public class ParkingReservationService {
         ParkingReservationEntity entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
 
-        ParkingReservation parkingReservation = ParkingReservationMapper.toDomain(entity);
+        ParkingReservation reservation = ParkingReservationMapper.toDomain(entity);
 
-        if (!parkingReservation.getUserId().equals(userId)) {
+        if (!reservation.getUserId().equals(userId)) {
             throw new IllegalStateException("User not authorized to cancel this parking reservation");
         }
 
-        cancelDomainReservation(parkingReservation);
+        cancelDomainReservation(reservation);
 
-        entity.setStatus(parkingReservation.getStatus());
+        entity.setStatus(reservation.getStatus());
         reservationRepository.save(entity);
     }
 
-    private ParkingReservation buildParkingReservation(CreateParkingReservationRequest request, Long userId) {
+    @Override
+    protected void validateAvailability(
+            CreateParkingReservationRequest request,
+            LocalDateTime start,
+            LocalDateTime end
+    ) {
         if (request.getFacilityId() == null) {
             throw new IllegalArgumentException("Facility id is required");
+        }
+
+        if (request.getArrivalDate() == null || request.getArrivalTime() == null) {
+            throw new IllegalArgumentException("Arrival date and time are required");
         }
 
         Integer durationHours = request.getDurationHours();
@@ -82,19 +102,44 @@ public class ParkingReservationService {
             throw new IllegalArgumentException("Duration must be at least 1 hour");
         }
 
-        LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
+        if (!start.isBefore(end)) {
+            throw new IllegalArgumentException("Start date must be before end date");
+        }
+    }
 
+    @Override
+    protected ParkingReservation buildReservation(
+            CreateParkingReservationRequest request,
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end) {
         return new ParkingReservation(
                 userId,
                 request.getFacilityId(),
-                startDate,
-                startDate.plusHours(durationHours),
+                start,
+                end,
                 request.getCity(),
                 request.getFacilityName(),
                 request.getFacilityAddress(),
-                durationHours,
+                request.getDurationHours(),
                 request.getTotalCost()
         );
+    }
+
+    @Override
+    @Transactional
+    protected ParkingReservation saveReservation(ParkingReservation reservation) {
+        ParkingReservationEntity saved = reservationRepository.save(
+                ParkingReservationMapper.toEntity(reservation)
+        );
+        return ParkingReservationMapper.toDomain(saved);
+    }
+
+    private int resolveDurationHours(Integer durationHours) {
+        if (durationHours == null || durationHours <= 0) {
+            throw new IllegalArgumentException("Duration must be at least 1 hour");
+        }
+        return durationHours;
     }
 
     private void cancelDomainReservation(ParkingReservation reservation) {
@@ -130,8 +175,7 @@ public class ParkingReservationService {
         }
     }
 
-    private ParkingReservationResponse toResponse(ParkingReservation reservation, LocalDateTime createdAt) {
-        LocalDateTime confirmedAt = createdAt == null ? LocalDateTime.now() : createdAt;
+    private ParkingReservationResponse toResponse(ParkingReservation reservation, LocalDateTime confirmedAt) {
         ReservationStatus status = reservation.getStatus() == null
                 ? ReservationStatus.CONFIRMED
                 : reservation.getStatus();
@@ -142,7 +186,7 @@ public class ParkingReservationService {
                 .facilityAddress(reservation.getFacilityAddress())
                 .city(reservation.getCity())
                 .arrivalDate(reservation.getStartDate().toLocalDate().toString())
-                .arrivalTime(reservation.getStartDate().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                .arrivalTime(reservation.getStartDate().toLocalTime().format(TIME_FORMATTER))
                 .durationHours(reservation.getDurationHours())
                 .totalCost(reservation.getTotalCost())
                 .status(status.name())

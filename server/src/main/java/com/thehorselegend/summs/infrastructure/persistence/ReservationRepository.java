@@ -1,9 +1,14 @@
 package com.thehorselegend.summs.infrastructure.persistence;
 
-import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import com.thehorselegend.summs.domain.reservation.ReservationStatus;
+
 import java.util.List;
 
+/**
+ * Repository for accessing Reservation entities.
+ * Supports both Vehicle and Parking reservations through JPA inheritance.
+ */
 public interface ReservationRepository extends JpaRepository<ReservationEntity, Long> {
 
     /**
@@ -14,15 +19,15 @@ public interface ReservationRepository extends JpaRepository<ReservationEntity, 
     List<ReservationEntity> findByUserId(Long userId);
 
     /**
-     * Retrieves all reservations for a specific reservable item (e.g., vehicle, room).
-     * @param reservableId the ID of the reservable item
-     * @return a list of ReservationEntity objects for that item
+     * Retrieves all reservations associated with a specific reservable item.
+     * @param reservableId the ID of the reservable resource
+     * @return a list of ReservationEntity objects linked to that resource
      */
     List<ReservationEntity> findByReservableId(Long reservableId);
 
     /**
-     * Retrieves all reservations with a specific status (e.g., CONFIRMED, CANCELLED).
-     * @param status the ReservationStatus to filter by
+     * Retrieves all reservations with a specific status.
+     * @param status the reservation status to filter by
      * @return a list of ReservationEntity objects with the given status
      */
     List<ReservationEntity> findByStatus(ReservationStatus status);

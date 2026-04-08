@@ -2,6 +2,7 @@ package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.api.dto.CreateParkingReservationRequest;
 import com.thehorselegend.summs.api.dto.ParkingReservationResponse;
+import com.thehorselegend.summs.application.service.reservation.ParkingReservationService;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationEntity;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationRepository;
@@ -48,20 +49,20 @@ class ParkingReservationServiceTest {
         request.setTotalCost(18.0);
         request.setPaymentMethod("CREDIT");
 
-        ParkingReservationEntity savedEntity = ParkingReservationEntity.builder()
-                .id(11L)
-                .facilityId(77L)
-                .facilityName("Downtown Garage")
-                .facilityAddress("123 Main St")
-                .city("Montreal")
-                .arrivalDate("2026-03-27")
-                .arrivalTime("14:00")
-                .durationHours(4)
-                .totalCost(18.0)
-                .userId(5L)
-                .status(ReservationStatus.CONFIRMED)
-                .createdAt(LocalDateTime.of(2026, 3, 26, 10, 15))
-                .build();
+        ParkingReservationEntity savedEntity = new ParkingReservationEntity(
+                11L,
+                5L,
+                77L,
+                LocalDateTime.of(2026, 3, 27, 14, 0),
+                LocalDateTime.of(2026, 3, 27, 18, 0),
+                "Montreal",
+                ReservationStatus.CONFIRMED,
+                "Downtown Garage",
+                "123 Main St",
+                4,
+                18.0,
+                LocalDateTime.of(2026, 3, 26, 10, 15)
+        );
 
         when(parkingReservationRepository.save(any(ParkingReservationEntity.class)))
                 .thenReturn(savedEntity);
@@ -76,20 +77,20 @@ class ParkingReservationServiceTest {
 
     @Test
     void getUserReservationsReturnsMappedReservations() {
-        ParkingReservationEntity reservation = ParkingReservationEntity.builder()
-                .id(21L)
-                .facilityId(3L)
-                .facilityName("Old Port Parking")
-                .facilityAddress("45 Harbor Rd")
-                .city("Montreal")
-                .arrivalDate("2026-03-30")
-                .arrivalTime("09:30")
-                .durationHours(2)
-                .totalCost(7.5)
-                .userId(9L)
-                .status(ReservationStatus.CONFIRMED)
-                .createdAt(LocalDateTime.of(2026, 3, 26, 12, 30))
-                .build();
+        ParkingReservationEntity reservation = new ParkingReservationEntity(
+                21L,
+                9L,
+                3L,
+                LocalDateTime.of(2026, 3, 30, 9, 30),
+                LocalDateTime.of(2026, 3, 30, 11, 30),
+                "Montreal",
+                ReservationStatus.CONFIRMED,
+                "Old Port Parking",
+                "45 Harbor Rd",
+                2,
+                7.5,
+                LocalDateTime.of(2026, 3, 26, 12, 30)
+        );
 
         when(parkingReservationRepository.findByUserIdOrderByCreatedAtDesc(9L))
                 .thenReturn(List.of(reservation));
@@ -103,20 +104,20 @@ class ParkingReservationServiceTest {
 
     @Test
     void cancelReservationMarksReservationAsCancelled() {
-        ParkingReservationEntity reservation = ParkingReservationEntity.builder()
-                .id(31L)
-                .facilityId(3L)
-                .facilityName("Old Port Parking")
-                .facilityAddress("45 Harbor Rd")
-                .city("Montreal")
-                .arrivalDate("2026-03-30")
-                .arrivalTime("09:30")
-                .durationHours(2)
-                .totalCost(7.5)
-                .userId(4L)
-                .status(ReservationStatus.CONFIRMED)
-                .createdAt(LocalDateTime.of(2026, 3, 26, 9, 0))
-                .build();
+        ParkingReservationEntity reservation = new ParkingReservationEntity(
+                31L,
+                4L,
+                3L,
+                LocalDateTime.of(2026, 3, 30, 9, 30),
+                LocalDateTime.of(2026, 3, 30, 11, 30),
+                "Montreal",
+                ReservationStatus.CONFIRMED,
+                "Old Port Parking",
+                "45 Harbor Rd",
+                2,
+                7.5,
+                LocalDateTime.of(2026, 3, 26, 9, 0)
+        );
 
         when(parkingReservationRepository.findById(31L))
                 .thenReturn(Optional.of(reservation));
@@ -131,20 +132,20 @@ class ParkingReservationServiceTest {
 
     @Test
     void cancelReservationThrowsWhenUserDoesNotOwnReservation() {
-        ParkingReservationEntity reservation = ParkingReservationEntity.builder()
-                .id(32L)
-                .facilityId(3L)
-                .facilityName("Old Port Parking")
-                .facilityAddress("45 Harbor Rd")
-                .city("Montreal")
-                .arrivalDate("2026-03-30")
-                .arrivalTime("09:30")
-                .durationHours(2)
-                .totalCost(7.5)
-                .userId(8L)
-                .status(ReservationStatus.CONFIRMED)
-                .createdAt(LocalDateTime.of(2026, 3, 26, 9, 0))
-                .build();
+        ParkingReservationEntity reservation = new ParkingReservationEntity(
+                32L,
+                8L,
+                3L,
+                LocalDateTime.of(2026, 3, 30, 9, 30),
+                LocalDateTime.of(2026, 3, 30, 11, 30),
+                "Montreal",
+                ReservationStatus.CONFIRMED,
+                "Old Port Parking",
+                "45 Harbor Rd",
+                2,
+                7.5,
+                LocalDateTime.of(2026, 3, 26, 9, 0)
+        );
 
         when(parkingReservationRepository.findById(32L))
                 .thenReturn(Optional.of(reservation));

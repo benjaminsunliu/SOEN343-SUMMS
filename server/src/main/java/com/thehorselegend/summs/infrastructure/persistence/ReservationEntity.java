@@ -16,7 +16,9 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_reservations_status_end_date", columnList = "status,end_date")
         }
 )
-public class ReservationEntity {
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "reservation_type", discriminatorType = DiscriminatorType.STRING)
+public abstract class ReservationEntity {
 
     @Id
     @Column(name = "reservation_id")
@@ -43,33 +45,18 @@ public class ReservationEntity {
     @Column(nullable = false, length = 20)
     private ReservationStatus status;
 
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "latitude", column = @Column(name = "start_latitude")),
-            @AttributeOverride(name = "longitude", column = @Column(name = "start_longitude"))
-    })
-    private LocationEmbeddable startLocation;
-
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "latitude", column = @Column(name = "end_latitude")),
-            @AttributeOverride(name = "longitude", column = @Column(name = "end_longitude"))
-    })
-    private LocationEmbeddable endLocation;
-
-    public ReservationEntity() {
+    protected ReservationEntity() {
     }
 
-    public ReservationEntity(
+    protected ReservationEntity(
             Long id,
             Long userId,
             Long reservableId,
             LocalDateTime startDate,
             LocalDateTime endDate,
             String city,
-            ReservationStatus status,
-            LocationEmbeddable startLocation,
-            LocationEmbeddable endLocation) {
+            ReservationStatus status
+    ) {
         this.id = id;
         this.userId = userId;
         this.reservableId = reservableId;
@@ -77,8 +64,6 @@ public class ReservationEntity {
         this.endDate = endDate;
         this.city = city;
         this.status = status;
-        this.startLocation = startLocation;
-        this.endLocation = endLocation;
     }
 
     public Long getId() {
@@ -136,10 +121,4 @@ public class ReservationEntity {
     public void setStatus(ReservationStatus status) {
         this.status = status;
     }
-
-    public LocationEmbeddable getStartLocation() { return startLocation; }
-    public void setStartLocation(LocationEmbeddable startLocation) { this.startLocation = startLocation; }
-
-    public LocationEmbeddable getEndLocation() { return endLocation; }
-    public void setEndLocation(LocationEmbeddable endLocation) { this.endLocation = endLocation; }
 }
