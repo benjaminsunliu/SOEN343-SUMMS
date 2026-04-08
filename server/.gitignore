@@ -34,3 +34,6 @@ build/
 
 # macOS
 .DS_Store
+
+# Local secrets — never commit
+src/main/resources/application-local.properties
