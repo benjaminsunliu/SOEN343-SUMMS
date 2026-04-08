@@ -40,7 +40,7 @@ public class ParkingController {
     /**
      * GET /api/parking/search
      * Query params mirror ParkingSearchRequestDTO fields.
-     * Accessible by any authenticated user (CITIZEN, PROVIDER, ADMIN).
+    * Accessible by any authenticated user (CITIZEN, PROVIDER, CITY_PROVIDER, ADMIN).
      *
      * Example: GET /api/parking/search?destination=175+rue+Ste-Catherine
      *                &durationHours=6&maxPricePerHour=5&city=Montreal
@@ -73,19 +73,19 @@ public class ParkingController {
     }
 
     @GetMapping("/management/spaces")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<List<ParkingFacilityDTO>> listParkingSpaces(Authentication authentication) {
         return ResponseEntity.ok(parkingFacilityService.getAllFacilities(resolveAuthenticatedUserId(authentication)));
     }
 
     @GetMapping("/management/catalog")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<List<ParkingCatalogEntryDto>> listParkingCatalog(Authentication authentication) {
         return ResponseEntity.ok(parkingFacilityService.getCatalogEntriesWithStatus(resolveAuthenticatedUserId(authentication)));
     }
 
     @PostMapping("/management/catalog/{terrainCode}/add")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<ParkingFacilityDTO> addParkingSpaceFromCatalog(
             @PathVariable String terrainCode,
             Authentication authentication) {
@@ -95,7 +95,7 @@ public class ParkingController {
     }
 
     @PostMapping("/management/spaces")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<ParkingFacilityDTO> createParkingSpace(
             @Valid @RequestBody ParkingFacilityUpsertRequest request,
             Authentication authentication) {
@@ -103,7 +103,7 @@ public class ParkingController {
     }
 
     @PutMapping("/management/spaces/{facilityId}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<ParkingFacilityDTO> updateParkingSpace(
             @PathVariable Long facilityId,
             @Valid @RequestBody ParkingFacilityUpsertRequest request,
@@ -115,7 +115,7 @@ public class ParkingController {
     }
 
     @DeleteMapping("/management/spaces/{facilityId}")
-    @PreAuthorize("hasAnyRole('PROVIDER', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<Void> deleteParkingSpace(@PathVariable Long facilityId, Authentication authentication) {
         parkingFacilityService.deleteFacility(facilityId, resolveAuthenticatedUserId(authentication));
         return ResponseEntity.noContent().build();

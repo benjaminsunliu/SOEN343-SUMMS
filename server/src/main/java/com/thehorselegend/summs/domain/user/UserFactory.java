@@ -13,6 +13,10 @@ public class UserFactory {
         return new User(null, name, email, passwordHash, UserRole.PROVIDER);
     }
 
+    public static User createCityProvider(String name, String email, String passwordHash) {
+        return new User(null, name, email, passwordHash, UserRole.CITY_PROVIDER);
+    }
+
     public static User createAdmin(String name, String email, String passwordHash) {
         return new User(null, name, email, passwordHash, UserRole.ADMIN);
     }

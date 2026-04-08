@@ -1,0 +1,20 @@
+package com.thehorselegend.summs.application.service.auth.strategy;
+
+import com.thehorselegend.summs.domain.user.User;
+import com.thehorselegend.summs.domain.user.UserFactory;
+import com.thehorselegend.summs.domain.user.UserRole;
+import org.springframework.stereotype.Component;
+
+@Component
+public class CityProviderRegistrationStrategy implements UserRegistrationStrategy {
+
+    @Override
+    public UserRole supportedRole() {
+        return UserRole.CITY_PROVIDER;
+    }
+
+    @Override
+    public User create(String name, String email, String passwordHash) {
+        return UserFactory.createCityProvider(name, email, passwordHash);
+    }
+}

@@ -83,7 +83,7 @@ const navSections: NavSection[] = [
     items: [
       { label: "Analytics", to: "/analytics/rentals", roles: ["PROVIDER", "ADMIN"] },
       { label: "Provider Dashboard", to: "/provider/operations", roles: ["PROVIDER", "ADMIN"] },
-      { label: "Parking Management", to: "/provider/parking", roles: ["PROVIDER", "ADMIN"] },
+      { label: "City Dashboard", to: "/city/dashboard", roles: ["CITY_PROVIDER", "ADMIN"] },
     ],
   },
   {

@@ -6,7 +6,7 @@ export interface AuthUser {
   token: string;
 }
 
-export type AuthRole = "CITIZEN" | "PROVIDER" | "ADMIN";
+export type AuthRole = "CITIZEN" | "PROVIDER" | "CITY_PROVIDER" | "ADMIN";
 
 const AUTH_STORAGE_KEY = "summs.authUser";
 
@@ -78,12 +78,22 @@ export function getAuthRole(): AuthRole | null {
   if (
     normalizedRole === "CITIZEN" ||
     normalizedRole === "PROVIDER" ||
+    normalizedRole === "CITY_PROVIDER" ||
     normalizedRole === "ADMIN"
   ) {
     return normalizedRole;
   }
 
   return null;
+}
+
+export function getDefaultDashboardPath(): string {
+  const role = getAuthRole();
+  if (role === "CITY_PROVIDER") {
+    return "/city/dashboard";
+  }
+
+  return "/dashboard";
 }
 
 export function hasAnyRole(roles: AuthRole[]): boolean {

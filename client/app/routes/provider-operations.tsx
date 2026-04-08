@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { SiteNav } from "../root";
 import type { Route } from "./+types/provider-operations";
 import { apiFetch } from "../utils/api";
-import { getAuthUser } from "../utils/auth";
+import { getAuthUser, hasAnyRole } from "../utils/auth";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -46,6 +46,7 @@ export default function ProviderOperationsPage() {
   const [transactionError, setTransactionError] = useState<string | null>(null);
   const authUser = getAuthUser();
   const providerId = authUser?.id;
+  const canManageCityParking = hasAnyRole(["ADMIN"]);
 
   useEffect(() => {
     fetchVehicles();
@@ -138,9 +139,11 @@ export default function ProviderOperationsPage() {
               <p className="text-gray-400 text-sm mt-1">Manage your fleet and monitor performance</p>
             </div>
             <div className="flex gap-2">
-              <a href="/provider/parking" className="border border-cyan-600 text-cyan-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-cyan-500/20">
-                Manage Parking
-              </a>
+              {canManageCityParking && (
+                <a href="/city/dashboard" className="border border-cyan-600 text-cyan-300 px-4 py-2 rounded-lg text-sm font-medium hover:bg-cyan-500/20">
+                  Manage Parking
+                </a>
+              )}
               <a href="/provider/vehicles" className="bg-cyan-600 text-gray-900 px-4 py-2 rounded-lg text-sm font-medium hover:bg-cyan-500">
                 + Add Vehicle
               </a>
