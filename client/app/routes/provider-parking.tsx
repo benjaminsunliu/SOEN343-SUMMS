@@ -246,6 +246,10 @@ export default function ProviderParkingPage() {
                 </thead>
                 <tbody>
                   {sortedCatalog.map((entry) => {
+                    const addedSpace = entry.addedFacilityId
+                      ? facilityById.get(entry.addedFacilityId)
+                      : undefined;
+
                     return (
                     <tr key={entry.terrainCode} className="border-b border-gray-800">
                       <td className="px-2 py-2">
@@ -276,7 +280,32 @@ export default function ProviderParkingPage() {
                             Add
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-500">-</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (addedSpace) {
+                                  startEdit(addedSpace);
+                                }
+                              }}
+                              className="rounded border border-cyan-500 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-500/20"
+                              disabled={!addedSpace}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (addedSpace) {
+                                  void handleDelete(addedSpace.facilityId);
+                                }
+                              }}
+                              className="rounded border border-red-500 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
+                              disabled={!addedSpace}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
