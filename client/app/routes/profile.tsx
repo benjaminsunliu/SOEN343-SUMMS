@@ -16,6 +16,11 @@ interface PaymentTransactionHistoryItem {
   createdAt: string;
 }
 
+interface Co2SavingsData {
+  totalCo2SavedKg: number;
+  sustainableTripCount: number;
+}
+
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Profile | SUMMS" },
@@ -31,6 +36,8 @@ export default function ProfilePage() {
   const [transactions, setTransactions] = useState<PaymentTransactionHistoryItem[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
   const [transactionError, setTransactionError] = useState<string | null>(null);
+  const [co2Data, setCo2Data] = useState<Co2SavingsData | null>(null);
+  const [isLoadingCo2, setIsLoadingCo2] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -77,6 +84,45 @@ export default function ProfilePage() {
     };
   }, [authUser]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadUserCo2() {
+      if (!authUser) {
+        setCo2Data(null);
+        return;
+      }
+
+      setIsLoadingCo2(true);
+
+      try {
+        const response = await apiFetch(`/api/analytics/co2/user/${authUser.id}`);
+        if (!response.ok) {
+          throw new Error("Failed to load CO₂ data");
+        }
+
+        const data = (await response.json()) as Co2SavingsData;
+        if (isMounted) {
+          setCo2Data(data);
+        }
+      } catch {
+        if (isMounted) {
+          setCo2Data({ totalCo2SavedKg: 0, sustainableTripCount: 0 });
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCo2(false);
+        }
+      }
+    }
+
+    void loadUserCo2();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser]);
+
   const successfulTransactions = transactions.filter((transaction) => transaction.success);
   const totalSpent = successfulTransactions.reduce(
     (sum, transaction) => sum + transaction.amount,
@@ -105,6 +151,36 @@ export default function ProfilePage() {
                 <ProfileField label="Name" value={authUser.name} />
                 <ProfileField label="Email" value={authUser.email} />
                 <ProfileField label="Role" value={authUser.role} />
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-green-500/50 bg-green-500/10 p-5">
+              <h2 className="mb-3 text-lg font-semibold text-green-400">Environmental Impact</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {isLoadingCo2 ? (
+                  <p className="text-sm text-gray-400">Loading CO₂ data...</p>
+                ) : (
+                  <>
+                    <div className="rounded-xl bg-green-900/20 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wider text-green-300">Total CO₂ Saved</p>
+                      <p className="mt-2 text-3xl font-bold text-green-400">
+                        {(co2Data?.totalCo2SavedKg ?? 0).toFixed(2)} <span className="text-lg">kg</span>
+                      </p>
+                      <p className="mt-1 text-xs text-green-300">
+                        Equivalent to {((co2Data?.totalCo2SavedKg ?? 0) / 2.4).toFixed(1)} tree seedlings grown for 10 years
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-blue-900/20 px-4 py-3">
+                      <p className="text-xs uppercase tracking-wider text-blue-300">Sustainable Trips</p>
+                      <p className="mt-2 text-3xl font-bold text-blue-400">
+                        {co2Data?.sustainableTripCount ?? 0}
+                      </p>
+                      <p className="mt-1 text-xs text-blue-300">
+                        Average ~{co2Data && co2Data.sustainableTripCount > 0 ? (co2Data.totalCo2SavedKg / co2Data.sustainableTripCount).toFixed(2) : "0.00"} kg CO₂ saved per trip
+                      </p>
+                    </div>
+                  </>
+                )}
               </div>
             </section>
 

@@ -3,7 +3,6 @@ package com.thehorselegend.summs.application.service.transit;
 import com.thehorselegend.summs.api.dto.TransitLineStatusDTO;
 import com.thehorselegend.summs.api.dto.TransitRouteDTO;
 import com.thehorselegend.summs.api.dto.TransitSearchRequestDTO;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;
@@ -12,11 +11,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
-@Primary
 public class MockTransitAdapter implements TransitService{
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("HH:mm");
 
-    // ── Static line status data ──────────────────────────────────────────────
+    //Status data
     private static final List<TransitLineStatusDTO> LINE_STATUSES = List.of(
         TransitLineStatusDTO.builder()
             .lineId("M1").lineNumber("1").lineName("Green Line")
@@ -55,7 +53,7 @@ public class MockTransitAdapter implements TransitService{
             .statusMessage("10-min delays due to road work").lineColor("#E40520").build()
     );
 
-    // ── Route templates (duplicated with time offsets when searching) ────────
+    //Route templates
     private List<TransitRouteDTO> buildRoutes(TransitSearchRequestDTO req) {
         String baseTime = (req.getTime() != null && !req.getTime().isBlank())
                 ? req.getTime() : "09:00";

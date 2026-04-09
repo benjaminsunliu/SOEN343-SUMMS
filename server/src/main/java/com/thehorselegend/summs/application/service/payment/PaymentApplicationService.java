@@ -25,6 +25,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class PaymentApplicationService {
+    public static final double FIXED_SERVICE_FEE_AMOUNT = 2.50;
+    public static final double FIXED_TAX_RATE = 0.15;
 
     private final Map<String, PaymentMethodStrategy> strategyByMethod;
 
@@ -40,22 +42,22 @@ public class PaymentApplicationService {
                                                    PaymentOptions options,
                                                    String paymentMethod,
                                                    PaymentMethodDetails paymentMethodDetails) {
-        Payment payment = new ReservationPayment(reservation);
-        payment = applyDecorators(payment, options);
+        return executePayment(buildPayment(reservation, options), paymentMethod, paymentMethodDetails);
+    }
 
-        PaymentMethodStrategy strategy = resolveStrategy(paymentMethod);
-        PaymentResult rawResult = strategy.processPayment(payment.getAmount(), paymentMethodDetails);
-
-        String message = rawResult.getMessage()
-                + " | amount=" + payment.getAmount()
-                + " | details=" + payment.getDescription();
-
-        return new PaymentResult(rawResult.isSuccess(), message, rawResult.getTransactionId());
+    public PaymentResult processReservationPayment(double baseAmount,
+                                                   PaymentOptions options,
+                                                   String paymentMethod,
+                                                   PaymentMethodDetails paymentMethodDetails) {
+        return executePayment(buildPayment(baseAmount, options), paymentMethod, paymentMethodDetails);
     }
 
     public Payment buildPayment(Reservation reservation, PaymentOptions options) {
-        Payment payment = new ReservationPayment(reservation);
-        return applyDecorators(payment, options);
+        return applyDecorators(new ReservationPayment(reservation), options);
+    }
+
+    public Payment buildPayment(double baseAmount, PaymentOptions options) {
+        return applyDecorators(new ReservationPayment(baseAmount), options);
     }
 
     private Payment applyDecorators(Payment payment, PaymentOptions options) {
@@ -91,6 +93,19 @@ public class PaymentApplicationService {
         }
 
         return strategy;
+    }
+
+    private PaymentResult executePayment(Payment payment,
+                                         String paymentMethod,
+                                         PaymentMethodDetails paymentMethodDetails) {
+        PaymentMethodStrategy strategy = resolveStrategy(paymentMethod);
+        PaymentResult rawResult = strategy.processPayment(payment.getAmount(), paymentMethodDetails);
+
+        String message = rawResult.getMessage()
+                + " | amount=" + payment.getAmount()
+                + " | details=" + payment.getDescription();
+
+        return new PaymentResult(rawResult.isSuccess(), message, rawResult.getTransactionId());
     }
 
     /**

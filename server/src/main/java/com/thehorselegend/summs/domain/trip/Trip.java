@@ -12,6 +12,7 @@ public class Trip {
     private final LocalDateTime startTime;
     private LocalDateTime endTime;
     private Long totalDurationMinutes;
+    private Double co2SavedKg;
 
     public Trip(
             Long id,
@@ -28,6 +29,26 @@ public class Trip {
         this.startTime = startTime;
         this.endTime = endTime;
         this.totalDurationMinutes = totalDurationMinutes;
+        this.co2SavedKg = 0.0;
+    }
+
+    public Trip(
+            Long id,
+            Long reservationId,
+            Long vehicleId,
+            Long citizenId,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            Long totalDurationMinutes,
+            Double co2SavedKg) {
+        this.id = id;
+        this.reservationId = reservationId;
+        this.vehicleId = vehicleId;
+        this.citizenId = citizenId;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.totalDurationMinutes = totalDurationMinutes;
+        this.co2SavedKg = co2SavedKg;
     }
 
     public static Trip start(Long reservationId, Long vehicleId, Long citizenId, LocalDateTime startTime) {
@@ -76,5 +97,9 @@ public class Trip {
 
     public Long getTotalDurationMinutes() {
         return totalDurationMinutes;
+    }
+
+    public Double getCo2SavedKg() {
+        return co2SavedKg;
     }
 }

@@ -10,6 +10,7 @@ import com.thehorselegend.summs.domain.trip.Trip;
 import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.domain.vehicle.Vehicle;
 import com.thehorselegend.summs.domain.vehicle.VehicleStatus;
+import com.thehorselegend.summs.domain.vehicle.VehicleType;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationMapper;
 import com.thehorselegend.summs.infrastructure.persistence.ReservationRepository;
 import com.thehorselegend.summs.infrastructure.persistence.TripMapper;
@@ -19,8 +20,6 @@ import com.thehorselegend.summs.infrastructure.persistence.VehicleRepository;
 import com.thehorselegend.summs.shared.time.SummsTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Service
 public class RentalLifecycleService {
@@ -40,20 +39,22 @@ public class RentalLifecycleService {
     private static final double PLATEAU_MIN_LON = -73.6100;
     private static final double PLATEAU_MAX_LON = -73.5600;
     private static final double RESERVATION_DESTINATION_TOLERANCE = 0.0020;
-    private static final String INVALID_DROPOFF_MESSAGE =
-            "Trip cannot be ended outside a valid drop-off zone or your reserved destination.";
+    private static final String INVALID_DROPOFF_MESSAGE = "Trip cannot be ended outside a valid drop-off zone or your reserved destination.";
 
     private final TripRepository tripRepository;
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
+    private final Co2EmissionsService co2EmissionsService;
 
     public RentalLifecycleService(
             TripRepository tripRepository,
             VehicleRepository vehicleRepository,
-            ReservationRepository reservationRepository) {
+            ReservationRepository reservationRepository,
+            Co2EmissionsService co2EmissionsService) {
         this.tripRepository = tripRepository;
         this.vehicleRepository = vehicleRepository;
         this.reservationRepository = reservationRepository;
+        this.co2EmissionsService = co2EmissionsService;
     }
 
     @Transactional
@@ -62,14 +63,16 @@ public class RentalLifecycleService {
                 .map(ReservationMapper::toDomain)
                 .filter(VehicleReservation.class::isInstance)
                 .map(VehicleReservation.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Reservation not found with id: " + request.reservationId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Reservation not found with id: " + request.reservationId()));
 
         validateReservation(reservation, citizenId);
         authorizePayment(request.paymentAuthorizationCode());
 
         Vehicle vehicle = vehicleRepository.findById(reservation.getReservableId())
                 .map(VehicleMapper::toDomain)
-                .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + reservation.getReservableId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Vehicle not found with id: " + reservation.getReservableId()));
 
         if (tripRepository.findByVehicleIdAndEndTimeIsNull(vehicle.getId()).isPresent()) {
             throw new IllegalArgumentException("Vehicle already has an active trip.");
@@ -88,7 +91,7 @@ public class RentalLifecycleService {
         Trip trip = Trip.start(reservation.getId(), vehicle.getId(), citizenId, SummsTime.now());
         Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(trip)));
 
-        return toResponse(savedTrip, vehicle.getStatus());
+        return toResponse(savedTrip, vehicle.getStatus(), vehicle.getType());
     }
 
     @Transactional
@@ -105,7 +108,8 @@ public class RentalLifecycleService {
                 .map(ReservationMapper::toDomain)
                 .filter(VehicleReservation.class::isInstance)
                 .map(VehicleReservation.class::cast)
-                .orElseThrow(() -> new IllegalArgumentException("Reservation not found with id: " + trip.getReservationId()));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Reservation not found with id: " + trip.getReservationId()));
 
         LocationDto dropOffLocation = request.dropOffLocation();
         boolean endedInValidZone = isValidDropOffZone(dropOffLocation);
@@ -123,16 +127,57 @@ public class RentalLifecycleService {
         if (endedInValidZone) {
             reservation.setEndLocation(actualDropOffLocation);
         }
+        
+        // Calculate CO₂ emissions saved ONLY for sustainable vehicles (bikes and scooters)
+        Double co2Saved = 0.0;
+        System.out.println("DEBUG: Vehicle Type = " + vehicle.getType() + " (VehicleType.BICYCLE=" + VehicleType.BICYCLE + ", VehicleType.SCOOTER=" + VehicleType.SCOOTER + ")");
+        System.out.println("DEBUG: Comparing vehicle.getType() == VehicleType.BICYCLE: " + (vehicle.getType() == VehicleType.BICYCLE));
+        System.out.println("DEBUG: Comparing vehicle.getType() == VehicleType.SCOOTER: " + (vehicle.getType() == VehicleType.SCOOTER));
+        
+        if (vehicle.getType() == VehicleType.BICYCLE || vehicle.getType() == VehicleType.SCOOTER) {
+            System.out.println("DEBUG: Vehicle is sustainable (BICYCLE or SCOOTER) - calculating CO₂");
+            // Only calculate CO₂ for sustainable mobility options
+            if (reservation.getStartLocation() != null) {
+                System.out.println("DEBUG: Start location exists - calculating distance");
+                co2Saved = co2EmissionsService.calculateCo2Saved(
+                        reservation.getStartLocation().latitude(),
+                        reservation.getStartLocation().longitude(),
+                        actualDropOffLocation.latitude(),
+                        actualDropOffLocation.longitude()
+                );
+                System.out.println("DEBUG: CO₂ Calculated = " + co2Saved + " kg");
+            } else {
+                // Log warning if start location is missing
+                System.err.println("WARNING: Start location is null for trip " + tripId + 
+                        ". Using default CO₂ value of 0.0");
+            }
+        } else {
+            System.out.println("DEBUG: Vehicle is NOT sustainable (CAR) - not calculating CO₂, setting to 0.0");
+            co2Saved = 0.0;
+        }
+        
         trip.complete(SummsTime.now());
         reservation.complete();
         reservationRepository.save(ReservationMapper.toEntity(reservation));
 
         vehicle.release(actualDropOffLocation);
 
-        Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(trip)));
+        // Create a new Trip with CO₂ data to persist
+        Trip tripWithCo2 = new Trip(
+                trip.getId(),
+                trip.getReservationId(),
+                trip.getVehicleId(),
+                trip.getCitizenId(),
+                trip.getStartTime(),
+                trip.getEndTime(),
+                trip.getTotalDurationMinutes(),
+                co2Saved
+        );
+
+        Trip savedTrip = TripMapper.toDomain(tripRepository.save(TripMapper.toEntity(tripWithCo2)));
         vehicleRepository.save(VehicleMapper.toEntity(vehicle));
 
-        return toResponse(savedTrip, vehicle.getStatus());
+        return toResponse(savedTrip, vehicle.getStatus(), vehicle.getType());
     }
 
     public TripResponse getTripById(Long tripId) {
@@ -144,7 +189,7 @@ public class RentalLifecycleService {
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        return toResponse(trip, vehicle.getStatus());
+        return toResponse(trip, vehicle.getStatus(), vehicle.getType());
     }
 
     public TripResponse getTripByReservationId(Long citizenId, Long reservationId) {
@@ -160,7 +205,7 @@ public class RentalLifecycleService {
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        return toResponse(trip, vehicle.getStatus());
+        return toResponse(trip, vehicle.getStatus(), vehicle.getType());
     }
 
     public TripResponse getActiveTripForCitizen(Long citizenId) {
@@ -172,7 +217,11 @@ public class RentalLifecycleService {
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found with id: " + trip.getVehicleId()));
 
-        return toResponse(trip, vehicle.getStatus());
+        return toResponse(trip, vehicle.getStatus(), vehicle.getType());
+    }
+
+    public boolean hasActiveTripForCitizen(Long citizenId) {
+        return tripRepository.findByCitizenIdAndEndTimeIsNull(citizenId).isPresent();
     }
 
     private void validateReservation(VehicleReservation reservation, Long citizenId) {
@@ -201,7 +250,8 @@ public class RentalLifecycleService {
 
         return isInsideZone(latitude, longitude, DOWNTOWN_MIN_LAT, DOWNTOWN_MAX_LAT, DOWNTOWN_MIN_LON, DOWNTOWN_MAX_LON)
                 || isInsideZone(latitude, longitude, VERDUN_MIN_LAT, VERDUN_MAX_LAT, VERDUN_MIN_LON, VERDUN_MAX_LON)
-                || isInsideZone(latitude, longitude, PLATEAU_MIN_LAT, PLATEAU_MAX_LAT, PLATEAU_MIN_LON, PLATEAU_MAX_LON);
+                || isInsideZone(latitude, longitude, PLATEAU_MIN_LAT, PLATEAU_MAX_LAT, PLATEAU_MIN_LON,
+                        PLATEAU_MAX_LON);
     }
 
     private boolean isValidDropOffLocation(LocationDto location, VehicleReservation reservation) {
@@ -210,7 +260,8 @@ public class RentalLifecycleService {
 
     private boolean isNearReservationDestination(LocationDto location, Location reservationDestination) {
         return Math.abs(location.latitude() - reservationDestination.latitude()) <= RESERVATION_DESTINATION_TOLERANCE
-                && Math.abs(location.longitude() - reservationDestination.longitude()) <= RESERVATION_DESTINATION_TOLERANCE;
+                && Math.abs(
+                        location.longitude() - reservationDestination.longitude()) <= RESERVATION_DESTINATION_TOLERANCE;
     }
 
     private boolean isInsideZone(
@@ -226,7 +277,7 @@ public class RentalLifecycleService {
                 && longitude <= maxLon;
     }
 
-    private TripResponse toResponse(Trip trip, VehicleStatus vehicleStatus) {
+    private TripResponse toResponse(Trip trip, VehicleStatus vehicleStatus, VehicleType vehicleType) {
         return new TripResponse(
                 trip.getId(),
                 trip.getReservationId(),
@@ -235,7 +286,9 @@ public class RentalLifecycleService {
                 trip.getStartTime(),
                 trip.getEndTime(),
                 trip.getTotalDurationMinutes(),
-                vehicleStatus.name()
+                vehicleStatus.name(),
+                trip.getCo2SavedKg(),
+                vehicleType.name()
         );
     }
 }

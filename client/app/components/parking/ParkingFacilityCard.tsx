@@ -1,22 +1,29 @@
 import { useNavigate } from "react-router";
-import type { ParkingFacility } from "../../utils/api";
+import type { ParkingFacility, ParkingSearchParams } from "../../utils/api";
 
 interface Props {
   facility: ParkingFacility;
   durationHours: number;
+  searchParams: ParkingSearchParams | null;
 }
 
-export default function ParkingFacilityCard({ facility, durationHours }: Props) {
+export default function ParkingFacilityCard({ facility, durationHours, searchParams }: Props) {
   const navigate = useNavigate();
 
   const isAlmostFull = facility.availabilityStatus === "ALMOST_FULL";
   const isFull      = facility.availabilityStatus === "FULL";
 
-    const handleReserve = () => {
+  const handleReserve = () => {
     navigate("/services/parking/confirm", { 
-        state: { facility, durationHours },
+        state: {
+          facility,
+          durationHours,
+          arrivalDate: searchParams?.arrivalDate ?? new Date().toISOString().split("T")[0],
+          arrivalTime: searchParams?.arrivalTime ?? "14:00",
+          city: searchParams?.city ?? facility.city,
+        },
     });
-    };
+  };
 
   return (
     <div
