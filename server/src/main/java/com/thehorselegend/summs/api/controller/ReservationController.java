@@ -7,7 +7,6 @@ import com.thehorselegend.summs.api.dto.VehicleReservationRequest;
 import com.thehorselegend.summs.api.dto.VehicleReservationResponse;
 import com.thehorselegend.summs.application.service.RentalLifecycleService;
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
-import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Location;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
@@ -116,7 +115,6 @@ public class ReservationController {
     ) {
         Long userId = resolveAuthenticatedUserId(authentication);
         List<VehicleReservationResponse> response = reservationService.getUserReservations(userId).stream()
-                .map(this::toVehicleReservation)
                 .map(VehicleReservationResponse::fromDomain)
                 .toList();
 
@@ -154,7 +152,7 @@ public class ReservationController {
 
     private VehicleReservation reserveVehicle(Long userId, Long vehicleId, VehicleReservationRequest request) {
         try {
-            return (VehicleReservation) reservationService.reserveVehicle(
+            return reservationService.reserveVehicle(
                     userId,
                     vehicleId,
                     request.getCity(),
@@ -196,7 +194,7 @@ public class ReservationController {
 
     private VehicleReservation fetchVehicleReservationById(Long reservationId, Long userId) {
         try {
-            return toVehicleReservation(reservationService.getUserReservationById(reservationId, userId));
+            return reservationService.getUserReservationById(reservationId, userId);
         } catch (IllegalArgumentException ex) {
             if (RESERVATION_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
@@ -208,12 +206,5 @@ public class ReservationController {
             }
             throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
         }
-    }
-
-    private VehicleReservation toVehicleReservation(Reservation reservation) {
-        if (reservation instanceof VehicleReservation vehicleReservation) {
-            return vehicleReservation;
-        }
-        throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle reservation not found");
     }
 }

@@ -1,6 +1,5 @@
 package com.thehorselegend.summs.application.service.reservation;
 
-import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Location;
@@ -21,10 +20,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
-public class VehicleReservationService extends AbstractReservationService<Vehicle> {
+public class VehicleReservationService extends ReservationCreationTemplate<VehicleReservationService.VehicleReservationSource, VehicleReservation> {
 
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
@@ -36,53 +34,79 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
     }
 
     @Override
-    protected void validateAvailability(Vehicle vehicle, LocalDateTime start, LocalDateTime end) {
+    protected void validateAvailability(
+            VehicleReservationSource source,
+            LocalDateTime start,
+            LocalDateTime end) {
+        Vehicle vehicle = source.vehicle();
+
         if (!vehicle.isAvailable()) {
             throw new IllegalStateException("Vehicle is not available for reservation");
         }
-        if (start.isAfter(end)) {
+
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Start date and end date are required");
+        }
+
+        if (!start.isBefore(end)) {
             throw new IllegalArgumentException("Start date must be before end date");
         }
+
         boolean hasConflict = reservationRepository.findByReservableId(vehicle.getId()).stream()
-                .anyMatch(r -> r.getStatus() == ReservationStatus.PENDING
-                        && start.isBefore(r.getEndDate())
-                        && end.isAfter(r.getStartDate()));
+                .map(ReservationMapper::toDomain)
+                .filter(reservation -> reservation instanceof VehicleReservation)
+                .anyMatch(reservation ->
+                        (reservation.getStatus() == ReservationStatus.PENDING
+                                || reservation.getStatus() == ReservationStatus.CONFIRMED)
+                                && start.isBefore(reservation.getEndDate())
+                                && end.isAfter(reservation.getStartDate())
+                );
+
         if (hasConflict) {
             throw new IllegalStateException("Vehicle already reserved in this period");
         }
     }
 
     @Override
-    protected Reservation buildReservation(Vehicle vehicle, Long userId, LocalDateTime start, LocalDateTime end) {
-        return new VehicleReservation(
+    protected VehicleReservation buildReservation(
+            VehicleReservationSource source,
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end) {
+        Vehicle vehicle = source.vehicle();
+
+        VehicleReservation reservation = new VehicleReservation(
                 userId,
                 vehicle.getId(),
                 start,
                 end,
-                "CITY",
+                source.city(),
                 vehicle.getLocation(),
-                vehicle.getLocation()
+                source.endLocation()
         );
+
+        reservation.confirm();
+        return reservation;
     }
 
     @Override
     @Transactional
-    protected Reservation saveReservation(Reservation reservation) {
-        var entity = ReservationMapper.toEntity(reservation);
-        var savedEntity = reservationRepository.save(entity);
+    protected VehicleReservation saveReservation(VehicleReservation reservation) {
+        ReservationEntity entity = ReservationMapper.toEntity(reservation);
+        ReservationEntity savedEntity = reservationRepository.save(entity);
 
         vehicleRepository.findById(reservation.getReservableId())
                 .map(VehicleMapper::toDomain)
-                .ifPresent(v -> {
-                    v.reserve();
-                    vehicleRepository.save(VehicleMapper.toEntity(v));
+                .ifPresent(vehicle -> {
+                    vehicle.reserve();
+                    vehicleRepository.save(VehicleMapper.toEntity(vehicle));
                 });
 
-        return ReservationMapper.toDomain(savedEntity);
+        return (VehicleReservation) ReservationMapper.toDomain(savedEntity);
     }
 
     @Transactional
-    public Reservation reserveVehicle(
+    public VehicleReservation reserveVehicle(
             Long userId,
             Long vehicleId,
             String city,
@@ -94,30 +118,20 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
-        validateAvailability(vehicle, startDate, endDate);
-
-        Location startLocation = vehicle.getLocation();
-
-        VehicleReservation reservation = new VehicleReservation(
+        return createReservation(
+                new VehicleReservationSource(vehicle, city, endLocation),
                 userId,
-                vehicleId,
                 startDate,
-                endDate,
-                city,
-                startLocation,
-                endLocation
+                endDate
         );
-
-        reservation.confirm();
-        return (VehicleReservation) saveReservation(reservation);
     }
 
     @Transactional
-    public Reservation cancelReservation(Long reservationId, Long userId) {
+    public VehicleReservation cancelReservation(Long reservationId, Long userId) {
         var entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
 
-        var reservation = ReservationMapper.toDomain(entity);
+        VehicleReservation reservation = toVehicleReservation(ReservationMapper.toDomain(entity));
 
         if (!reservation.getUserId().equals(userId)) {
             throw new IllegalStateException("User not authorized to cancel this reservation");
@@ -127,59 +141,74 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
 
         vehicleRepository.findById(reservation.getReservableId())
                 .map(VehicleMapper::toDomain)
-                .ifPresent(v -> {
-                    v.makeAvailable();
-                    vehicleRepository.save(VehicleMapper.toEntity(v));
+                .ifPresent(vehicle -> {
+                    vehicle.makeAvailable();
+                    vehicleRepository.save(VehicleMapper.toEntity(vehicle));
                 });
 
-        var savedEntity = reservationRepository.save(ReservationMapper.toEntity(reservation));
-        return ReservationMapper.toDomain(savedEntity);
+        ReservationEntity savedEntity = reservationRepository.save(ReservationMapper.toEntity(reservation));
+        return toVehicleReservation(ReservationMapper.toDomain(savedEntity));
     }
 
     @Transactional
-    public List<Reservation> getUserReservations(Long userId) {
+    public List<VehicleReservation> getUserReservations(Long userId) {
         LocalDateTime now = SummsTime.now();
         List<ReservationEntity> reservationEntities = reservationRepository.findByUserId(userId);
+
         Set<Long> reservableIdsToRelease = new LinkedHashSet<>();
+        List<ReservationEntity> entitiesToUpdate = new ArrayList<>();
 
         for (ReservationEntity reservationEntity : reservationEntities) {
-            if (shouldExpire(reservationEntity.getStatus(), reservationEntity.getEndDate(), now)) {
-                reservationEntity.setStatus(ReservationStatus.EXPIRED);
-                reservableIdsToRelease.add(reservationEntity.getReservableId());
+            if (!(ReservationMapper.toDomain(reservationEntity) instanceof VehicleReservation reservation)) {
+                continue;
             }
+
+            if (shouldExpire(reservation.getStatus(), reservation.getEndDate(), now)) {
+                reservation.expire();
+                entitiesToUpdate.add(ReservationMapper.toEntity(reservation));
+                reservableIdsToRelease.add(reservation.getReservableId());
+            }
+        }
+
+        if (!entitiesToUpdate.isEmpty()) {
+            reservationRepository.saveAll(entitiesToUpdate);
         }
 
         releaseReservedVehicles(reservableIdsToRelease);
 
-        return reservationEntities.stream()
+        return reservationRepository.findByUserId(userId).stream()
                 .map(ReservationMapper::toDomain)
-                .collect(Collectors.toList());
+                .filter(reservation -> reservation instanceof VehicleReservation)
+                .map(reservation -> (VehicleReservation) reservation)
+                .toList();
     }
 
     @Transactional(readOnly = true)
-    public Reservation getReservationById(Long reservationId) {
-        var entity = reservationRepository.findById(reservationId)
+    public VehicleReservation getReservationById(Long reservationId) {
+        ReservationEntity entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
-        return ReservationMapper.toDomain(entity);
+        return toVehicleReservation(ReservationMapper.toDomain(entity));
     }
 
     @Transactional
-    public Reservation getUserReservationById(Long reservationId, Long userId) {
-        Reservation reservation = getReservationById(reservationId);
+    public VehicleReservation getUserReservationById(Long reservationId, Long userId) {
+        VehicleReservation reservation = getReservationById(reservationId);
         if (!reservation.getUserId().equals(userId)) {
             throw new IllegalStateException("User not authorized to access this reservation");
         }
         return expireReservationIfNeeded(reservation, SummsTime.now());
     }
 
-    private Reservation expireReservationIfNeeded(Reservation reservation, LocalDateTime now) {
+    private VehicleReservation expireReservationIfNeeded(VehicleReservation reservation, LocalDateTime now) {
         if (!shouldExpire(reservation.getStatus(), reservation.getEndDate(), now)) {
             return reservation;
         }
 
         reservation.expire();
-        Reservation expiredReservation = ReservationMapper.toDomain(
-                reservationRepository.save(ReservationMapper.toEntity(reservation))
+        VehicleReservation expiredReservation = toVehicleReservation(
+                ReservationMapper.toDomain(
+                        reservationRepository.save(ReservationMapper.toEntity(reservation))
+                )
         );
 
         releaseReservedVehicles(Set.of(reservation.getReservableId()));
@@ -211,4 +240,20 @@ public class VehicleReservationService extends AbstractReservationService<Vehicl
         boolean isExpirable = status == ReservationStatus.PENDING || status == ReservationStatus.CONFIRMED;
         return isExpirable && !endDate.isAfter(now);
     }
+
+    private VehicleReservation toVehicleReservation(com.thehorselegend.summs.domain.reservation.Reservation reservation) {
+        if (reservation instanceof VehicleReservation vehicleReservation) {
+            return vehicleReservation;
+        }
+        throw new IllegalArgumentException("Vehicle reservation not found");
+    }
+
+    static record VehicleReservationSource(
+            Vehicle vehicle,
+            String city,
+            Location endLocation
+    ) {
+    }
 }
+
+

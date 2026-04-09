@@ -1,7 +1,6 @@
 package com.thehorselegend.summs.application.service;
 
 import com.thehorselegend.summs.application.service.reservation.VehicleReservationService;
-import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
 import com.thehorselegend.summs.domain.vehicle.Car;
@@ -91,9 +90,13 @@ class VehicleReservationServiceTest {
 
     @Test
     void testCreateReservation() {
-        VehicleReservation created = (VehicleReservation) reservationService.createReservation(
-                vehicle,
+        when(reservationRepository.findByReservableId(vehicleId)).thenReturn(List.of());
+
+        VehicleReservation created = reservationService.reserveVehicle(
                 userId,
+                vehicleId,
+                "CITY",
+                end,
                 startTime,
                 endTime
         );
@@ -115,6 +118,8 @@ class VehicleReservationServiceTest {
                 "ABC123",
                 4
         );
+        when(reservationRepository.saveAll(any()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
         VehicleReservation pastConfirmedReservation = new VehicleReservation(
                 99L,
                 userId,
@@ -129,12 +134,27 @@ class VehicleReservationServiceTest {
 
         when(vehicleRepository.findById(vehicleId)).thenReturn(Optional.of(VehicleMapper.toEntity(reservedVehicle)));
         when(vehicleRepository.findAllById(any())).thenReturn(List.of(VehicleMapper.toEntity(reservedVehicle)));
+        VehicleReservation expiredReservation = new VehicleReservation(
+                99L,
+                userId,
+                vehicleId,
+                pastConfirmedReservation.getStartDate(),
+                pastConfirmedReservation.getEndDate(),
+                "CITY",
+                ReservationStatus.EXPIRED,
+                start,
+                end
+        );
+
         when(reservationRepository.findByUserId(userId))
-                .thenReturn(List.of(ReservationMapper.toEntity(pastConfirmedReservation)));
+                .thenReturn(
+                        List.of(ReservationMapper.toEntity(pastConfirmedReservation)),
+                        List.of(ReservationMapper.toEntity(expiredReservation))
+                );
         when(vehicleRepository.saveAll(any()))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        List<Reservation> reservations = reservationService.getUserReservations(userId);
+        List<VehicleReservation> reservations = reservationService.getUserReservations(userId);
 
         assertEquals(1, reservations.size());
         assertEquals(ReservationStatus.EXPIRED, reservations.get(0).getStatus());

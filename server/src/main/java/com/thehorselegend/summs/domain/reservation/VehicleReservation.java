@@ -8,15 +8,16 @@ public class VehicleReservation extends Reservation {
     private Location startLocation;
     private Location endLocation;
 
-    public VehicleReservation(Long reservationId,
-                              Long userId,
-                              Long reservableId,
-                              LocalDateTime start,
-                              LocalDateTime end,
-                              String city,
-                              ReservationStatus status,
-                              Location startLocation,
-                              Location endLocation) {
+    public VehicleReservation(
+            Long reservationId,
+            Long userId,
+            Long reservableId,
+            LocalDateTime start,
+            LocalDateTime end,
+            String city,
+            ReservationStatus status,
+            Location startLocation,
+            Location endLocation) {
         super(reservationId, userId, reservableId, start, end, city, status);
         this.startLocation = startLocation;
         this.endLocation = endLocation;
@@ -32,6 +33,11 @@ public class VehicleReservation extends Reservation {
         super(userId, reservableId, start, end, city, ReservationStatus.PENDING);
         this.startLocation = startLocation;
         this.endLocation = endLocation;
+    }
+
+    @Override
+    public ReservableType getReservableType() {
+        return ReservableType.VEHICLE;
     }
 
     public Location getStartLocation() {

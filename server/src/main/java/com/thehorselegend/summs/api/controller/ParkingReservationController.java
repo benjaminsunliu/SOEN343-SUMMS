@@ -2,7 +2,7 @@ package com.thehorselegend.summs.api.controller;
 
 import com.thehorselegend.summs.api.dto.CreateParkingReservationRequest;
 import com.thehorselegend.summs.api.dto.ParkingReservationResponse;
-import com.thehorselegend.summs.application.service.ParkingReservationService;
+import com.thehorselegend.summs.application.service.reservation.ParkingReservationService;
 import com.thehorselegend.summs.infrastructure.persistence.UserEntity;
 import com.thehorselegend.summs.infrastructure.persistence.UserRepository;
 import lombok.RequiredArgsConstructor;

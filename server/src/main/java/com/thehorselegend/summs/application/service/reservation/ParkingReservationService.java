@@ -1,4 +1,5 @@
-package com.thehorselegend.summs.application.service;
+package com.thehorselegend.summs.application.service.reservation;
+
 
 import com.thehorselegend.summs.api.dto.CreateParkingReservationRequest;
 import com.thehorselegend.summs.api.dto.ParkingReservationResponse;
@@ -28,8 +29,9 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ParkingReservationService {
+public class ParkingReservationService extends ReservationCreationTemplate<ParkingReservationService.ParkingReservationSource, ParkingReservation> {
     private static final DateTimeFormatter CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     private static final long PARKING_PROVIDER_PLACEHOLDER_ID = 0L;
     private static final String MODIFY_NOT_AUTHORIZED_MESSAGE = "User not authorized to modify this parking reservation";
 
@@ -40,16 +42,18 @@ public class ParkingReservationService {
     @Transactional
     public ParkingReservationResponse createReservation(
             CreateParkingReservationRequest request,
-            Long userId) {
-
+            Long userId
+    ) {
         log.info("Creating parking reservation for facilityId={} userId={}",
                 request.getFacilityId(), userId);
 
-        ParkingReservation reservation = buildParkingReservation(request, userId);
+        LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
+        LocalDateTime endDate = startDate.plusHours(resolveDurationHours(request.getDurationHours()));
+
         PaymentApplicationService.PaymentOptions paymentOptions = buildPaymentOptions(request);
-        Payment payment = paymentApplicationService.buildPayment(reservation.getTotalCost(), paymentOptions);
+        Payment payment = paymentApplicationService.buildPayment(request.getTotalCost(), paymentOptions);
         PaymentResult paymentResult = paymentApplicationService.processReservationPayment(
-                reservation.getTotalCost(),
+                request.getTotalCost(),
                 paymentOptions,
                 request.getPaymentMethod(),
                 buildPaymentMethodDetails(request)
@@ -59,13 +63,13 @@ public class ParkingReservationService {
             throw new IllegalArgumentException(paymentResult.getMessage());
         }
 
-        reservation.setTotalCost(payment.getAmount());
-        reservation.confirm();
-
-        ParkingReservationEntity saved = reservationRepository.save(
-                ParkingReservationMapper.toEntity(reservation)
+        ParkingReservation savedReservation = createReservation(
+                new ParkingReservationSource(request, payment.getAmount()),
+                userId,
+                startDate,
+                endDate
         );
-        ParkingReservation savedReservation = ParkingReservationMapper.toDomain(saved);
+
         String paymentMethod = request.getPaymentMethod().toUpperCase(Locale.ROOT);
         String paymentAuthorizationCode = "PAY-" + paymentResult.getTransactionId();
 
@@ -81,15 +85,19 @@ public class ParkingReservationService {
                 paymentAuthorizationCode
         );
 
-        log.info("Parking reservation created id={}", saved.getId());
+        log.info("Parking reservation created id={}", savedReservation.getId());
 
-        return toResponse(savedReservation, saved.getCreatedAt());
+        ParkingReservationEntity savedEntity = reservationRepository.findById(savedReservation.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found after save"));
+
+        return toResponse(savedReservation, savedEntity.getCreatedAt());
     }
 
     @Transactional(readOnly = true)
     public List<ParkingReservationResponse> getUserReservations(Long userId) {
         return reservationRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(entity -> toResponse(ParkingReservationMapper.toDomain(entity), entity.getCreatedAt()))
+                .map(ParkingReservationMapper::toDomain)
+                .map(reservation -> toResponse(reservation, LocalDateTime.now()))
                 .toList();
     }
 
@@ -98,15 +106,15 @@ public class ParkingReservationService {
         ParkingReservationEntity entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
 
-        ParkingReservation parkingReservation = ParkingReservationMapper.toDomain(entity);
+        ParkingReservation reservation = ParkingReservationMapper.toDomain(entity);
 
-        if (!parkingReservation.getUserId().equals(userId)) {
+        if (!reservation.getUserId().equals(userId)) {
             throw new IllegalStateException("User not authorized to cancel this parking reservation");
         }
 
-        cancelDomainReservation(parkingReservation);
+        cancelDomainReservation(reservation);
 
-        entity.setStatus(parkingReservation.getStatus());
+        entity.setStatus(reservation.getStatus());
         reservationRepository.save(entity);
     }
 
@@ -115,13 +123,15 @@ public class ParkingReservationService {
         ParkingReservationEntity entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
 
-        ParkingReservation parkingReservation = ParkingReservationMapper.toDomain(entity);
-        ensureReservationOwnedByUser(parkingReservation, userId);
-        activateDomainReservation(parkingReservation);
+        ParkingReservation reservation = ParkingReservationMapper.toDomain(entity);
+        ensureReservationOwnedByUser(reservation, userId);
 
-        entity.setStatus(parkingReservation.getStatus());
-        ParkingReservationEntity savedEntity = reservationRepository.save(entity);
-        return toResponse(ParkingReservationMapper.toDomain(savedEntity), savedEntity.getCreatedAt());
+        activateDomainReservation(reservation);
+
+        entity.setStatus(reservation.getStatus());
+        reservationRepository.save(entity);
+
+        return toResponse(reservation, entity.getCreatedAt());
     }
 
     @Transactional
@@ -129,18 +139,31 @@ public class ParkingReservationService {
         ParkingReservationEntity entity = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
 
-        ParkingReservation parkingReservation = ParkingReservationMapper.toDomain(entity);
-        ensureReservationOwnedByUser(parkingReservation, userId);
-        completeDomainReservation(parkingReservation);
+        ParkingReservation reservation = ParkingReservationMapper.toDomain(entity);
+        ensureReservationOwnedByUser(reservation, userId);
 
-        entity.setStatus(parkingReservation.getStatus());
-        ParkingReservationEntity savedEntity = reservationRepository.save(entity);
-        return toResponse(ParkingReservationMapper.toDomain(savedEntity), savedEntity.getCreatedAt());
+        completeDomainReservation(reservation);
+
+        entity.setStatus(reservation.getStatus());
+        reservationRepository.save(entity);
+
+        return toResponse(reservation, entity.getCreatedAt());
     }
 
-    private ParkingReservation buildParkingReservation(CreateParkingReservationRequest request, Long userId) {
+    @Override
+    protected void validateAvailability(
+            ParkingReservationSource source,
+            LocalDateTime start,
+            LocalDateTime end
+    ) {
+        CreateParkingReservationRequest request = source.request();
+
         if (request.getFacilityId() == null) {
             throw new IllegalArgumentException("Facility id is required");
+        }
+
+        if (request.getArrivalDate() == null || request.getArrivalTime() == null) {
+            throw new IllegalArgumentException("Arrival date and time are required");
         }
 
         Integer durationHours = request.getDurationHours();
@@ -148,24 +171,39 @@ public class ParkingReservationService {
             throw new IllegalArgumentException("Duration must be at least 1 hour");
         }
 
-        Double totalCost = request.getTotalCost();
-        if (totalCost == null || totalCost < 0) {
-            throw new IllegalArgumentException("Parking total cost is required");
+        if (!start.isBefore(end)) {
+            throw new IllegalArgumentException("Start date must be before end date");
         }
 
-        LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
+        Double totalCost = source.finalTotalCost();
+        if (totalCost < 0) {
+            throw new IllegalArgumentException("Parking total cost is required");
+        }
+    }
 
-        return new ParkingReservation(
+    @Override
+    protected ParkingReservation buildReservation(
+            ParkingReservationSource source,
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end
+    ) {
+        CreateParkingReservationRequest request = source.request();
+
+        ParkingReservation reservation = new ParkingReservation(
                 userId,
                 request.getFacilityId(),
-                startDate,
-                startDate.plusHours(durationHours),
+                start,
+                end,
                 request.getCity(),
                 request.getFacilityName(),
                 request.getFacilityAddress(),
-                durationHours,
-                totalCost
+                request.getDurationHours(),
+                source.finalTotalCost()
         );
+
+        reservation.confirm();
+        return reservation;
     }
 
     private PaymentApplicationService.PaymentOptions buildPaymentOptions(CreateParkingReservationRequest request) {
@@ -187,6 +225,22 @@ public class ParkingReservationService {
                 request.getPaypalEmail(),
                 request.getPaypalPassword()
         );
+    }
+
+    @Override
+    @Transactional
+    protected ParkingReservation saveReservation(ParkingReservation reservation) {
+        ParkingReservationEntity saved = reservationRepository.save(
+                ParkingReservationMapper.toEntity(reservation)
+        );
+        return ParkingReservationMapper.toDomain(saved);
+    }
+
+    private int resolveDurationHours(Integer durationHours) {
+        if (durationHours == null || durationHours <= 0) {
+            throw new IllegalArgumentException("Duration must be at least 1 hour");
+        }
+        return durationHours;
     }
 
     private void cancelDomainReservation(ParkingReservation reservation) {
@@ -250,8 +304,7 @@ public class ParkingReservationService {
         }
     }
 
-    private ParkingReservationResponse toResponse(ParkingReservation reservation, LocalDateTime createdAt) {
-        LocalDateTime confirmedAt = createdAt == null ? LocalDateTime.now() : createdAt;
+    private ParkingReservationResponse toResponse(ParkingReservation reservation, LocalDateTime confirmedAt) {
         ReservationStatus status = reservation.getStatus() == null
                 ? ReservationStatus.CONFIRMED
                 : reservation.getStatus();
@@ -262,11 +315,17 @@ public class ParkingReservationService {
                 .facilityAddress(reservation.getFacilityAddress())
                 .city(reservation.getCity())
                 .arrivalDate(reservation.getStartDate().toLocalDate().toString())
-                .arrivalTime(reservation.getStartDate().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm")))
+                .arrivalTime(reservation.getStartDate().toLocalTime().format(TIME_FORMATTER))
                 .durationHours(reservation.getDurationHours())
                 .totalCost(reservation.getTotalCost())
                 .status(status.name())
                 .confirmedAt(confirmedAt.format(CONFIRMED_AT_FORMATTER))
                 .build();
+    }
+
+    public static record ParkingReservationSource(
+            CreateParkingReservationRequest request,
+            double finalTotalCost
+    ) {
     }
 }

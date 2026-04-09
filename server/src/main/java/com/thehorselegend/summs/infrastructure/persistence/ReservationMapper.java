@@ -2,32 +2,60 @@ package com.thehorselegend.summs.infrastructure.persistence;
 
 import com.thehorselegend.summs.domain.reservation.Reservation;
 import com.thehorselegend.summs.domain.reservation.VehicleReservation;
-import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.domain.vehicle.Location;
 
-public class ReservationMapper {
+public final class ReservationMapper {
 
-    private ReservationMapper() {}
+    private ReservationMapper() {
+    }
 
-    // Convert domain to entity
     public static ReservationEntity toEntity(Reservation reservation) {
-        if (reservation == null) return null;
+        if (reservation == null) {
+            return null;
+        }
 
+        if (reservation instanceof VehicleReservation vehicleReservation) {
+            return toVehicleEntity(vehicleReservation);
+        }
+
+        throw new IllegalArgumentException(
+                "Unsupported reservation type: " + reservation.getClass().getSimpleName()
+        );
+    }
+
+    public static Reservation toDomain(ReservationEntity entity) {
+        if (entity == null) {
+            return null;
+        }
+
+        if (entity instanceof VehicleReservationEntity vehicleReservationEntity) {
+            return toVehicleDomain(vehicleReservationEntity);
+        }
+
+        throw new IllegalArgumentException(
+                "Unsupported reservation entity type: " + entity.getClass().getSimpleName()
+        );
+    }
+
+    private static VehicleReservationEntity toVehicleEntity(VehicleReservation reservation) {
         LocationEmbeddable startEmbeddable = null;
         LocationEmbeddable endEmbeddable = null;
 
-        if (reservation instanceof VehicleReservation vehicleReservation) {
+        if (reservation.getStartLocation() != null) {
             startEmbeddable = new LocationEmbeddable(
-                    vehicleReservation.getStartLocation().latitude(),
-                    vehicleReservation.getStartLocation().longitude()
-            );
-            endEmbeddable = new LocationEmbeddable(
-                    vehicleReservation.getEndLocation().latitude(),
-                    vehicleReservation.getEndLocation().longitude()
+                    reservation.getStartLocation().latitude(),
+                    reservation.getStartLocation().longitude()
             );
         }
 
-        return new ReservationEntity(
+        if (reservation.getEndLocation() != null) {
+            endEmbeddable = new LocationEmbeddable(
+                    reservation.getEndLocation().latitude(),
+                    reservation.getEndLocation().longitude()
+            );
+        }
+
+        return new VehicleReservationEntity(
                 reservation.getId(),
                 reservation.getUserId(),
                 reservation.getReservableId(),
@@ -40,25 +68,34 @@ public class ReservationMapper {
         );
     }
 
-    // Convert entity to domain
-    public static Reservation toDomain(ReservationEntity entity) {
-        if (entity == null) return null;
+    private static VehicleReservation toVehicleDomain(VehicleReservationEntity entity) {
+        Location startLocation = null;
+        Location endLocation = null;
 
-        // If entity has vehicle coordinates, create VehicleReservation
-        if (entity.getStartLocation() != null && entity.getEndLocation() != null) {
-            return new VehicleReservation(
-                    entity.getId(),
-                    entity.getUserId(),
-                    entity.getReservableId(),
-                    entity.getStartDate(),
-                    entity.getEndDate(),
-                    entity.getCity(),
-                    entity.getStatus(),
-                    new Location(entity.getStartLocation().getLatitude(), entity.getStartLocation().getLongitude()),
-                    new Location(entity.getEndLocation().getLatitude(), entity.getEndLocation().getLongitude())
+        if (entity.getStartLocation() != null) {
+            startLocation = new Location(
+                    entity.getStartLocation().getLatitude(),
+                    entity.getStartLocation().getLongitude()
             );
         }
 
-        throw new IllegalArgumentException("Unknown reservation type for entity ID " + entity.getId());
+        if (entity.getEndLocation() != null) {
+            endLocation = new Location(
+                    entity.getEndLocation().getLatitude(),
+                    entity.getEndLocation().getLongitude()
+            );
+        }
+
+        return new VehicleReservation(
+                entity.getId(),
+                entity.getUserId(),
+                entity.getReservableId(),
+                entity.getStartDate(),
+                entity.getEndDate(),
+                entity.getCity(),
+                entity.getStatus(),
+                startLocation,
+                endLocation
+        );
     }
 }

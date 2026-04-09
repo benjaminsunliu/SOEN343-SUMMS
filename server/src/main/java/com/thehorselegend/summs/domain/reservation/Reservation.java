@@ -5,14 +5,20 @@ import java.time.LocalDateTime;
 public abstract class Reservation {
     private final Long reservationId;
     private final Long userId;
-    private ReservableType reservableType;
     private final Long reservableId;
     private final LocalDateTime startDate;
     private final LocalDateTime endDate;
     private String city;
     private ReservationStatus status;
 
-    public Reservation(Long id, Long userId, Long reservableId, LocalDateTime startDate, LocalDateTime endDate, String city, ReservationStatus status) {
+    public Reservation(
+            Long id,
+            Long userId,
+            Long reservableId,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String city,
+            ReservationStatus status) {
         this.reservationId = id;
         this.userId = userId;
         this.reservableId = reservableId;
@@ -22,11 +28,17 @@ public abstract class Reservation {
         this.status = status;
     }
 
-    public Reservation(Long userId, Long reservableId,
-                       LocalDateTime startDate, LocalDateTime endDate,
-                       String city, ReservationStatus status) {
+    public Reservation(
+            Long userId,
+            Long reservableId,
+            LocalDateTime startDate,
+            LocalDateTime endDate,
+            String city,
+            ReservationStatus status) {
         this(null, userId, reservableId, startDate, endDate, city, status);
     }
+
+    public abstract ReservableType getReservableType();
 
     public boolean overlaps(LocalDateTime start, LocalDateTime end) {
         return !(end.isBefore(this.startDate) || start.isAfter(this.endDate));
