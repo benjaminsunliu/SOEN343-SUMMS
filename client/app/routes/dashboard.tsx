@@ -3,7 +3,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   apiFetch,
+  fetchCityParkingAnalytics,
+  fetchParkingSummary,
+  listActiveParkingFacilities,
   listParkingReservations,
+  type CityParkingAnalytics,
+  type ParkingFacility,
+  type ParkingSummary,
   type ParkingReservationResponse,
 } from "../utils/api";
 import { getAuthUser } from "../utils/auth";
@@ -61,9 +67,12 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const authUser = useMemo(() => getAuthUser(), []);
   const [availableVehicles, setAvailableVehicles] = useState<VehicleResponse[]>([]);
+  const [availableParkingFacilities, setAvailableParkingFacilities] = useState<ParkingFacility[]>([]);
   const [activeReservations, setActiveReservations] = useState<number | null>(null);
   const [reservations, setReservations] = useState<BookingSummary[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTripSummary | null>(null);
+  const [parkingSummary, setParkingSummary] = useState<ParkingSummary | null>(null);
+  const [cityParkingAnalytics, setCityParkingAnalytics] = useState<CityParkingAnalytics | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -84,12 +93,17 @@ export default function DashboardPage() {
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [userCo2Saved, setUserCo2Saved] = useState<number | null>(null);
   const [isLoadingCo2, setIsLoadingCo2] = useState(false);
+  const normalizedRole = authUser?.role.trim().toUpperCase() ?? null;
+  const isCityParkingDashboard =
+    normalizedRole === "CITY_PROVIDER" || normalizedRole === "ADMIN";
 
   useEffect(() => {
-    // Fetch vehicles
+    // Fetch live map data (vehicles + parking spots)
     let isMounted = true;
 
-    async function loadAvailableVehicles() {
+    async function loadMapData() {
+      let hasFailure = false;
+
       try {
         const response = await apiFetch("/api/vehicles/status/AVAILABLE");
         if (!response.ok) {
@@ -100,20 +114,33 @@ export default function DashboardPage() {
         if (!isMounted) return;
 
         setAvailableVehicles(vehicles);
-        setMapError(null);
       } catch {
+        hasFailure = true;
         if (isMounted) {
-          setMapError("Unable to load live vehicle coordinates.");
           setAvailableVehicles([]);
         }
-      } finally {
-        if (isMounted) {
-          setIsLoadingMap(false);
+      }
+
+      try {
+        const facilities = await listActiveParkingFacilities();
+        if (!isMounted) {
+          return;
         }
+        setAvailableParkingFacilities(facilities);
+      } catch {
+        hasFailure = true;
+        if (isMounted) {
+          setAvailableParkingFacilities([]);
+        }
+      }
+
+      if (isMounted) {
+        setMapError(hasFailure ? "Some live map data could not be loaded." : null);
+        setIsLoadingMap(false);
       }
     }
 
-    void loadAvailableVehicles();
+    void loadMapData();
 
     return () => {
       isMounted = false;
@@ -151,7 +178,10 @@ export default function DashboardPage() {
           }));
 
         const confirmedParkingBookings: BookingSummary[] = parkingReservations
-          .filter((reservation) => reservation.status.toUpperCase() === "CONFIRMED")
+          .filter((reservation) => {
+            const normalizedStatus = reservation.status.toUpperCase();
+            return normalizedStatus === "CONFIRMED" || normalizedStatus === "ACTIVE";
+          })
           .map((reservation) => ({
             reservationId: reservation.reservationId,
             reservationType: "PARKING",
@@ -202,6 +232,71 @@ export default function DashboardPage() {
       isMounted = false;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    if (!isCityParkingDashboard) {
+      setCityParkingAnalytics(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadCityParkingAnalytics() {
+      try {
+        const analytics = await fetchCityParkingAnalytics();
+        if (!isMounted) {
+          return;
+        }
+        setCityParkingAnalytics(analytics);
+      } catch {
+        if (isMounted) {
+          setCityParkingAnalytics(null);
+        }
+      }
+    }
+
+    void loadCityParkingAnalytics();
+
+    const refreshIntervalId = window.setInterval(() => {
+      void loadCityParkingAnalytics();
+    }, 30_000);
+
+    const handleWindowFocus = () => {
+      void loadCityParkingAnalytics();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(refreshIntervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [isCityParkingDashboard]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadParkingSummary() {
+      try {
+        const summary = await fetchParkingSummary();
+        if (!isMounted) {
+          return;
+        }
+        setParkingSummary(summary);
+      } catch {
+        if (isMounted) {
+          setParkingSummary(null);
+        }
+      }
+    }
+
+    void loadParkingSummary();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Get browser location
@@ -330,6 +425,19 @@ export default function DashboardPage() {
         kind: markerKindForVehicleType(vehicle.type),
       }));
 
+    const parkingMarkers = availableParkingFacilities
+      .filter(
+        (facility) =>
+          facility.availableSpots > 0 &&
+          typeof facility.latitude === "number" &&
+          typeof facility.longitude === "number",
+      )
+      .map((facility) => ({
+        position: [facility.latitude as number, facility.longitude as number] as [number, number],
+        label: `${facility.name} - ${facility.availableSpots}/${facility.totalSpots} spots available`,
+        kind: "parking" as const,
+      }));
+
     if (hasPreciseUserLocation && userLocation) {
       return [
         {
@@ -341,11 +449,23 @@ export default function DashboardPage() {
           kind: "user",
         },
         ...vehicleMarkers,
+        ...parkingMarkers,
       ];
     }
 
-    return vehicleMarkers;
-  }, [availableVehicles, hasPreciseUserLocation, userLocation]);
+    return [...vehicleMarkers, ...parkingMarkers];
+  }, [availableVehicles, availableParkingFacilities, hasPreciseUserLocation, userLocation]);
+
+  const availableParkingMarkerCount = useMemo(
+    () =>
+      availableParkingFacilities.filter(
+        (facility) =>
+          facility.availableSpots > 0 &&
+          typeof facility.latitude === "number" &&
+          typeof facility.longitude === "number",
+      ).length,
+    [availableParkingFacilities],
+  );
 
   const vehiclesByType = useMemo(() => {
     const counts = { bicycles: 0, cars: 0, scooters: 0 };
@@ -361,10 +481,17 @@ export default function DashboardPage() {
     return counts;
   }, [availableVehicles]);
 
+  const dashboardActiveRentals = isCityParkingDashboard
+    ? Math.max(
+        cityParkingAnalytics?.occupiedSpaces ?? 0,
+        cityParkingAnalytics?.activeReservations.length ?? 0,
+      )
+    : activeReservations;
+
   const statCards = [
     {
       label: "Active Rentals",
-      value: activeReservations === null ? "--" : String(activeReservations),
+      value: dashboardActiveRentals === null ? "--" : String(dashboardActiveRentals),
       valueClass: "text-cyan-400",
     },
     {
@@ -372,7 +499,11 @@ export default function DashboardPage() {
       value: String(availableVehicles.length),
       valueClass: "text-blue-500",
     },
-    { label: "Free Parking Spots", value: "382", valueClass: "text-orange-400" },
+    {
+      label: "Free Parking Spots",
+      value: parkingSummary ? String(parkingSummary.availableSpots) : "--",
+      valueClass: "text-orange-400",
+    },
     {
       label: "Total CO₂ Saved by Users",
       value: isLoadingCo2 ? "..." : `${(userCo2Saved ?? 0).toFixed(1)} kg`,
@@ -470,6 +601,7 @@ export default function DashboardPage() {
                  <span className="rounded-md bg-black px-3 py-1 text-cyan-400">Bicycle: {vehiclesByType.bicycles}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-blue-500">Car: {vehiclesByType.cars}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-red-400">Scooter: {vehiclesByType.scooters}</span>
+                 <span className="rounded-md bg-black px-3 py-1 text-orange-400">Parking: {availableParkingMarkerCount}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-gray-300">Available: {availableVehicles.length}</span>
                </div>
              </div>

@@ -3,8 +3,10 @@ import { Link, useNavigate } from "react-router";
 import { SiteNav } from "../root";
 import {
   apiFetch,
+  checkoutParkingReservation,
   cancelParkingReservation,
   listParkingReservations,
+  occupyParkingReservation,
   type ParkingReservationResponse,
 } from "../utils/api";
 import type { Route } from "./+types/my-reservations";
@@ -57,7 +59,7 @@ export default function MyReservationsPage() {
     Record<number, ReservationTripDetails>
   >({});
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
-  const [cancelingReservationKeys, setCancelingReservationKeys] = useState<string[]>([]);
+  const [processingReservationKeys, setProcessingReservationKeys] = useState<string[]>([]);
   const [reservationError, setReservationError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -183,11 +185,11 @@ export default function MyReservationsPage() {
   const handleCancelReservation = async (reservation: ReservationCard) => {
     setActionError(null);
     setActionMessage(null);
-    const cancelKey = buildReservationKey(
+    const reservationKey = buildReservationKey(
       reservation.reservationId,
       reservation.reservationType,
     );
-    setCancelingReservationKeys((previousKeys) => [...previousKeys, cancelKey]);
+    setProcessingReservationKeys((previousKeys) => [...previousKeys, reservationKey]);
 
     try {
       if (reservation.reservationType === "PARKING") {
@@ -230,10 +232,86 @@ export default function MyReservationsPage() {
             : "Network error while canceling reservation.";
       setActionError(message);
     } finally {
-      setCancelingReservationKeys((previousKeys) =>
-        previousKeys.filter((existingKey) => existingKey !== cancelKey),
+      setProcessingReservationKeys((previousKeys) =>
+        previousKeys.filter((existingKey) => existingKey !== reservationKey),
       );
     }
+  };
+
+  const handleOccupyParkingReservation = async (
+    reservation: ParkingReservationResponse & { reservationType: "PARKING" },
+  ) => {
+    const reservationKey = buildReservationKey(
+      reservation.reservationId,
+      reservation.reservationType,
+    );
+
+    setActionError(null);
+    setActionMessage(null);
+    setProcessingReservationKeys((previousKeys) => [...previousKeys, reservationKey]);
+
+    try {
+      const updatedReservation = await occupyParkingReservation(reservation.reservationId);
+      replaceParkingReservation(updatedReservation);
+      setActionMessage(
+        `${reservation.facilityName} is now marked as occupied for reservation #${reservation.reservationId}.`,
+      );
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Network error while occupying parking spot.",
+      );
+    } finally {
+      setProcessingReservationKeys((previousKeys) =>
+        previousKeys.filter((existingKey) => existingKey !== reservationKey),
+      );
+    }
+  };
+
+  const handleCheckoutParkingReservation = async (
+    reservation: ParkingReservationResponse & { reservationType: "PARKING" },
+  ) => {
+    const reservationKey = buildReservationKey(
+      reservation.reservationId,
+      reservation.reservationType,
+    );
+
+    setActionError(null);
+    setActionMessage(null);
+    setProcessingReservationKeys((previousKeys) => [...previousKeys, reservationKey]);
+
+    try {
+      const updatedReservation = await checkoutParkingReservation(reservation.reservationId);
+      replaceParkingReservation(updatedReservation);
+      setActionMessage(
+        `Checked out of ${reservation.facilityName} for reservation #${reservation.reservationId}.`,
+      );
+    } catch (error) {
+      setActionError(
+        error instanceof Error
+          ? error.message
+          : "Network error while checking out of parking spot.",
+      );
+    } finally {
+      setProcessingReservationKeys((previousKeys) =>
+        previousKeys.filter((existingKey) => existingKey !== reservationKey),
+      );
+    }
+  };
+
+  const replaceParkingReservation = (updatedReservation: ParkingReservationResponse) => {
+    setReservations((previousReservations) =>
+      previousReservations.map((existingReservation) =>
+        existingReservation.reservationType === "PARKING" &&
+        existingReservation.reservationId === updatedReservation.reservationId
+          ? {
+              ...existingReservation,
+              ...updatedReservation,
+            }
+          : existingReservation,
+      ),
+    );
   };
 
   return (
@@ -244,7 +322,7 @@ export default function MyReservationsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-cyan-400">My Reservations</h1>
             <p className="text-sm text-gray-300">
-              View current and past vehicle + parking reservations, and cancel upcoming ones.
+              View current and past vehicle + parking reservations, and manage upcoming parking spots.
             </p>
           </div>
           <Link
@@ -287,17 +365,24 @@ export default function MyReservationsPage() {
                 const canStartTrip =
                   reservation.reservationType === "VEHICLE" &&
                   normalizedStatus === "CONFIRMED";
+                const canOccupySpot =
+                  reservation.reservationType === "PARKING" &&
+                  normalizedStatus === "CONFIRMED";
+                const canCheckoutSpot =
+                  reservation.reservationType === "PARKING" &&
+                  normalizedStatus === "ACTIVE";
                 const canCancel = normalizedStatus === "PENDING" || normalizedStatus === "CONFIRMED";
                 const isCompleted =
                   reservation.reservationType === "VEHICLE" &&
                   normalizedStatus === "COMPLETED";
-                const isCanceling = cancelingReservationKeys.includes(
+                const isProcessing = processingReservationKeys.includes(
                   buildReservationKey(reservation.reservationId, reservation.reservationType),
                 );
                 const tripDetails =
                   reservation.reservationType === "VEHICLE"
                     ? tripDetailsByReservationId[reservation.reservationId]
                     : null;
+                const parkingReservation = isVehicleReservation(reservation) ? null : reservation;
 
                 return (
                   <div
@@ -393,14 +478,42 @@ export default function MyReservationsPage() {
                             Pay & Start Trip
                           </button>
                         )}
+                        {canOccupySpot && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (parkingReservation) {
+                                void handleOccupyParkingReservation(parkingReservation);
+                              }
+                            }}
+                            disabled={isProcessing}
+                            className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isProcessing ? "Occupying..." : "Occupy Spot"}
+                          </button>
+                        )}
+                        {canCheckoutSpot && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (parkingReservation) {
+                                void handleCheckoutParkingReservation(parkingReservation);
+                              }
+                            }}
+                            disabled={isProcessing}
+                            className="rounded-md bg-amber-500 px-2.5 py-1 text-xs font-semibold text-slate-950 transition hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {isProcessing ? "Checking Out..." : "Check Out"}
+                          </button>
+                        )}
                         {canCancel && (
                           <button
                             type="button"
                             onClick={() => void handleCancelReservation(reservation)}
-                            disabled={isCanceling}
+                            disabled={isProcessing}
                             className="rounded-md border border-red-400 px-2.5 py-1 text-xs font-semibold text-red-300 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {isCanceling ? "Canceling..." : "Cancel"}
+                            {isProcessing ? "Canceling..." : "Cancel"}
                           </button>
                         )}
                       </div>

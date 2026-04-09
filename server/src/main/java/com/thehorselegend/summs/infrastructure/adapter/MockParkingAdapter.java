@@ -5,18 +5,20 @@ import com.thehorselegend.summs.api.dto.ParkingSearchRequestDTO;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Component
-@Primary
 @RequiredArgsConstructor  
 public class MockParkingAdapter implements IParkingService {
+    private static final Set<ReservationStatus> OCCUPYING_STATUSES = EnumSet.of(
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.ACTIVE
+    );
 
-    // Injected so we can subtract confirmed bookings from available spots
+    // Injected so we can subtract currently claimed spots from available spots
     private final ParkingReservationRepository reservationRepository;
 
     private static final List<ParkingFacilityDTO> MOCK_FACILITIES = List.of(

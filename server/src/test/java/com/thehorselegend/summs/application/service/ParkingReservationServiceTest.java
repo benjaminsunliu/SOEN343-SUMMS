@@ -23,8 +23,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -228,6 +228,99 @@ class ParkingReservationServiceTest {
 
         assertEquals(
                 "User not authorized to cancel this parking reservation",
+                exception.getMessage()
+        );
+    }
+
+    @Test
+    void occupyReservationMarksReservationAsActive() {
+        ParkingReservationEntity reservation = ParkingReservationEntity.builder()
+                .id(41L)
+                .facilityId(3L)
+                .facilityName("Old Port Parking")
+                .facilityAddress("45 Harbor Rd")
+                .city("Montreal")
+                .arrivalDate("2026-03-30")
+                .arrivalTime("09:30")
+                .durationHours(2)
+                .totalCost(7.5)
+                .userId(4L)
+                .status(ReservationStatus.CONFIRMED)
+                .createdAt(LocalDateTime.of(2026, 3, 26, 9, 0))
+                .build();
+
+        when(parkingReservationRepository.findById(41L))
+                .thenReturn(Optional.of(reservation));
+        when(parkingReservationRepository.save(any(ParkingReservationEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParkingReservationResponse response = parkingReservationService.occupyReservation(41L, 4L);
+
+        ArgumentCaptor<ParkingReservationEntity> reservationCaptor =
+                ArgumentCaptor.forClass(ParkingReservationEntity.class);
+        verify(parkingReservationRepository).save(reservationCaptor.capture());
+        assertEquals(ReservationStatus.ACTIVE, reservationCaptor.getValue().getStatus());
+        assertEquals("ACTIVE", response.getStatus());
+    }
+
+    @Test
+    void checkoutReservationMarksReservationAsCompleted() {
+        ParkingReservationEntity reservation = ParkingReservationEntity.builder()
+                .id(42L)
+                .facilityId(3L)
+                .facilityName("Old Port Parking")
+                .facilityAddress("45 Harbor Rd")
+                .city("Montreal")
+                .arrivalDate("2026-03-30")
+                .arrivalTime("09:30")
+                .durationHours(2)
+                .totalCost(7.5)
+                .userId(4L)
+                .status(ReservationStatus.ACTIVE)
+                .createdAt(LocalDateTime.of(2026, 3, 26, 9, 0))
+                .build();
+
+        when(parkingReservationRepository.findById(42L))
+                .thenReturn(Optional.of(reservation));
+        when(parkingReservationRepository.save(any(ParkingReservationEntity.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        ParkingReservationResponse response = parkingReservationService.checkoutReservation(42L, 4L);
+
+        ArgumentCaptor<ParkingReservationEntity> reservationCaptor =
+                ArgumentCaptor.forClass(ParkingReservationEntity.class);
+        verify(parkingReservationRepository).save(reservationCaptor.capture());
+        assertEquals(ReservationStatus.COMPLETED, reservationCaptor.getValue().getStatus());
+        assertEquals("COMPLETED", response.getStatus());
+    }
+
+    @Test
+    void occupyReservationThrowsWhenUserDoesNotOwnReservation() {
+        ParkingReservationEntity reservation = ParkingReservationEntity.builder()
+                .id(43L)
+                .facilityId(3L)
+                .facilityName("Old Port Parking")
+                .facilityAddress("45 Harbor Rd")
+                .city("Montreal")
+                .arrivalDate("2026-03-30")
+                .arrivalTime("09:30")
+                .durationHours(2)
+                .totalCost(7.5)
+                .userId(8L)
+                .status(ReservationStatus.CONFIRMED)
+                .createdAt(LocalDateTime.of(2026, 3, 26, 9, 0))
+                .build();
+
+        when(parkingReservationRepository.findById(43L))
+                .thenReturn(Optional.of(reservation));
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> parkingReservationService.occupyReservation(43L, 4L)
+        );
+
+        assertEquals(
+                "User not authorized to modify this parking reservation",
                 exception.getMessage()
         );
     }

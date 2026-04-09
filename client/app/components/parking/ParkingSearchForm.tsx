@@ -34,7 +34,6 @@ export default function ParkingSearchForm({ onSearch, onReset, loading }: Props)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.destination.trim()) return;
     onSearch(form);
   };
 
@@ -64,8 +63,7 @@ export default function ParkingSearchForm({ onSearch, onReset, loading }: Props)
           name="destination"
           value={form.destination}
           onChange={handleChange}
-          placeholder="e.g. 175 rue Ste-Catherine O."
-          required
+          placeholder="Optional (leave blank to browse available parking)"
           className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm
                      placeholder-gray-500 focus:outline-none focus:border-cyan-500 transition-colors"
         />

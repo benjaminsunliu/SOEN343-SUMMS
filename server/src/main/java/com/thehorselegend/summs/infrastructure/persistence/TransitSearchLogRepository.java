@@ -21,4 +21,9 @@ public interface TransitSearchLogRepository extends JpaRepository<TransitSearchL
     @Query("SELECT t.transitType, COUNT(t) as cnt FROM TransitSearchLogEntity t " +
            "GROUP BY t.transitType ORDER BY cnt DESC")
     List<Object[]> findSearchesByType();
+
+    @Query("SELECT returnedTransitType, COUNT(t) FROM TransitSearchLogEntity t " +
+           "JOIN t.returnedTransitTypes returnedTransitType " +
+           "GROUP BY returnedTransitType ORDER BY COUNT(t) DESC")
+    List<Object[]> findTopReturnedTransitTypes();
 }
