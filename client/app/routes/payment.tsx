@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { SiteNav } from "../root";
 import { apiFetch } from "../utils/api";
 import { setActiveTrip } from "../utils/trips";
 import type { Route } from "./+types/payment";
 
 const BASE_RATE_PER_MINUTE = 0.50;
+const FIXED_SERVICE_FEE_AMOUNT = 2.50;
+const FIXED_TAX_RATE = 0.15;
 
 interface ReservationResponse {
   reservationId: number;
@@ -83,11 +84,8 @@ export default function PaymentPage() {
   const [paypalEmail, setPaypalEmail] = useState("");
   const [paypalPassword, setPaypalPassword] = useState("");
 
-  const [includeServiceFee, setIncludeServiceFee] = useState(true);
-  const [serviceFeeAmount, setServiceFeeAmount] = useState(2.50);
-
-  const [includeTax, setIncludeTax] = useState(true);
-  const [taxRate, setTaxRate] = useState(0.15);
+  const serviceFeeAmount = FIXED_SERVICE_FEE_AMOUNT;
+  const taxRate = FIXED_TAX_RATE;
 
   const [includeInsuranceFee, setIncludeInsuranceFee] = useState(false);
   const [insuranceFeeAmount, setInsuranceFeeAmount] = useState(3.00);
@@ -104,6 +102,9 @@ export default function PaymentPage() {
   } | null>(null);
   const [transactions, setTransactions] = useState<PaymentTransactionHistoryItem[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(true);
+
+  const includeServiceFee = true;
+  const includeTax = true;
 
   const loadTransactionHistory = async () => {
     setIsLoadingTransactions(true);
@@ -193,12 +194,8 @@ export default function PaymentPage() {
   const estimatedAmount = useMemo(() => {
     let amount = baseAmount;
 
-    if (includeServiceFee) {
-      amount += serviceFeeAmount;
-    }
-    if (includeTax) {
-      amount *= 1 + taxRate;
-    }
+    amount += serviceFeeAmount;
+    amount *= 1 + taxRate;
     if (includeInsuranceFee) {
       amount += insuranceFeeAmount;
     }
@@ -209,9 +206,7 @@ export default function PaymentPage() {
     return amount;
   }, [
     baseAmount,
-    includeServiceFee,
     serviceFeeAmount,
-    includeTax,
     taxRate,
     includeInsuranceFee,
     insuranceFeeAmount,
@@ -339,7 +334,6 @@ export default function PaymentPage() {
 
   return (
     <>
-      <SiteNav />
       {successToast && (
         <div
           className={`fixed right-6 top-6 z-[100] max-w-sm rounded-lg border border-green-400/70 bg-green-500/25 px-4 py-3 text-sm text-green-100 shadow-lg backdrop-blur-sm transition-all duration-500 ${
@@ -349,7 +343,7 @@ export default function PaymentPage() {
           {successToast.message}
         </div>
       )}
-      <main className="ml-56 min-h-screen bg-gray-900 px-5 py-4 text-white">
+      <main className="min-h-screen bg-gray-900 px-5 py-4 text-white">
         <header className="mb-4 border-b border-[#253047] pb-3">
           <h1 className="text-2xl font-bold tracking-tight text-cyan-400">Payment</h1>
           <p className="text-sm text-gray-300">Pay for your reservation and start your trip.</p>
@@ -471,21 +465,18 @@ export default function PaymentPage() {
 
                 <FeeRow
                   label="Service Fee"
-                  checked={includeServiceFee}
-                  onCheckedChange={setIncludeServiceFee}
                   amount={serviceFeeAmount}
-                  onAmountChange={setServiceFeeAmount}
-                  step={0.1}
+                  required
+                  readOnly
+                  displayValue={formatMoney(serviceFeeAmount)}
                 />
 
                 <FeeRow
                   label="Tax Rate"
-                  checked={includeTax}
-                  onCheckedChange={setIncludeTax}
                   amount={taxRate}
-                  onAmountChange={setTaxRate}
-                  step={0.01}
-                  hint="Use decimal format (0.15 = 15%)."
+                  required
+                  readOnly
+                  displayValue={`${(taxRate * 100).toFixed(0)}%`}
                 />
 
                 <FeeRow
@@ -571,44 +562,65 @@ export default function PaymentPage() {
 
 interface FeeRowProps {
   label: string;
-  checked: boolean;
-  onCheckedChange: (value: boolean) => void;
   amount: number;
-  onAmountChange: (value: number) => void;
-  step: number;
+  onAmountChange?: (value: number) => void;
+  step?: number;
   hint?: string;
+  required?: boolean;
+  checked?: boolean;
+  onCheckedChange?: (value: boolean) => void;
+  readOnly?: boolean;
+  displayValue?: string;
 }
 
 function FeeRow({
   label,
-  checked,
-  onCheckedChange,
   amount,
   onAmountChange,
   step,
   hint,
+  required = false,
+  checked = true,
+  onCheckedChange,
+  readOnly = false,
+  displayValue,
 }: FeeRowProps) {
   return (
     <div className="rounded-lg border border-[#2d3d57] bg-[#101d34] px-3 py-2">
       <div className="flex items-center justify-between gap-3">
-        <label className="flex items-center gap-2 text-sm text-gray-200">
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={(event) => onCheckedChange(event.target.checked)}
-          />
-          {label}
-        </label>
+        {required ? (
+          <div className="text-sm text-gray-200">
+            {label}
+            <span className="ml-2 text-xs uppercase tracking-wide text-cyan-300">
+              {readOnly ? "Fixed" : "Required"}
+            </span>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-gray-200">
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={(event) => onCheckedChange?.(event.target.checked)}
+            />
+            {label}
+          </label>
+        )}
 
-        <input
-          type="number"
-          min={0}
-          step={step}
-          value={amount}
-          onChange={(event) => onAmountChange(parseNonNegativeNumber(event.target.value))}
-          disabled={!checked}
-          className="w-28 rounded-md border border-[#2d3d57] bg-[#071229] px-2 py-1 text-sm text-white disabled:opacity-60"
-        />
+        {readOnly ? (
+          <span className="rounded-md border border-[#2d3d57] bg-[#071229] px-3 py-1 text-sm font-medium text-cyan-200">
+            {displayValue ?? formatMoney(amount)}
+          </span>
+        ) : (
+          <input
+            type="number"
+            min={0}
+            step={step}
+            value={amount}
+            onChange={(event) => onAmountChange?.(parseNonNegativeNumber(event.target.value))}
+            disabled={!required && !checked}
+            className="w-28 rounded-md border border-[#2d3d57] bg-[#071229] px-2 py-1 text-sm text-white disabled:opacity-60"
+          />
+        )}
       </div>
       {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>

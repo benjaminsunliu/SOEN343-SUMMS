@@ -25,6 +25,7 @@ function useParkingSearch() {
   const [searched, setSearched] = useState(false);
   const [destination, setDest] = useState("");
   const [duration, setDuration] = useState(6);
+  const [searchParams, setSearchParams] = useState<ParkingSearchParams | null>(null);
 
   const search = useCallback(async (params: ParkingSearchParams) => {
     setLoading(true);
@@ -32,6 +33,7 @@ function useParkingSearch() {
     setSearched(true);
     setDest(params.destination);
     setDuration(params.durationHours);
+    setSearchParams(params);
 
     try {
       const data = await searchParking(params);
@@ -51,13 +53,14 @@ function useParkingSearch() {
     setError(null);
     setDest("");
     setDuration(6);
+    setSearchParams(null);
   }, []);
 
-  return { results, loading, error, searched, destination, duration, search, reset };
+  return { results, loading, error, searched, destination, duration, searchParams, search, reset };
 }
 
 export default function ParkingPage() {
-  const { results, loading, error, searched, destination, duration, search, reset } =
+  const { results, loading, error, searched, destination, duration, searchParams, search, reset } =
     useParkingSearch();
 
   return (
@@ -79,6 +82,7 @@ export default function ParkingPage() {
             searched={searched}
             destination={destination}
             durationHours={duration}
+            searchParams={searchParams}
           />
         </main>
       </div>
