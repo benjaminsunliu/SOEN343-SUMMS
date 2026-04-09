@@ -45,7 +45,7 @@ export default function TransitResultsList({ routes, loading, error, searched, o
     <div>
       <div className="bg-gray-800/50 border border-gray-700 rounded-xl px-4 py-3 mb-4">
         <p className="text-white text-sm font-medium">
-          {routes.length} route{routes.length !== 1 ? "s" : ""} found
+          {routes.length} step{routes.length !== 1 ? "s" : ""} found
           {origin && destination && (
             <span className="text-gray-400">
               {` from `}<span className="text-white">{origin}</span>

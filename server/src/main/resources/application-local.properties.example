@@ -1,0 +1,3 @@
+# Copy this file to application-local.properties and fill in your keys
+stm.api.key=your-stm-key-here
+google.maps.api.key=your-google-maps-key-here

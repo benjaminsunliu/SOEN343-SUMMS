@@ -3,6 +3,11 @@ package com.thehorselegend.summs.application.service.reservation;
 
 import com.thehorselegend.summs.api.dto.CreateParkingReservationRequest;
 import com.thehorselegend.summs.api.dto.ParkingReservationResponse;
+import com.thehorselegend.summs.application.service.payment.PaymentApplicationService;
+import com.thehorselegend.summs.application.service.payment.PaymentTransactionService;
+import com.thehorselegend.summs.domain.payment.calculation.Payment;
+import com.thehorselegend.summs.domain.payment.method.PaymentMethodDetails;
+import com.thehorselegend.summs.domain.payment.method.PaymentResult;
 import com.thehorselegend.summs.domain.reservation.ParkingReservation;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationEntity;
@@ -19,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -27,7 +33,11 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
 
     private static final DateTimeFormatter CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
+    private static final long PARKING_PROVIDER_PLACEHOLDER_ID = 0L;
+
     private final ParkingReservationRepository reservationRepository;
+    private final PaymentApplicationService paymentApplicationService;
+    private final PaymentTransactionService paymentTransactionService;
 
     @Transactional
     public ParkingReservationResponse createReservation(
@@ -42,13 +52,43 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
 
         validateAvailability(request, startDate, endDate);
         ParkingReservation reservation = buildReservation(request, userId, startDate, endDate);
+        PaymentApplicationService.PaymentOptions paymentOptions = buildPaymentOptions(request);
+        Payment payment = paymentApplicationService.buildPayment(reservation.getTotalCost(), paymentOptions);
+        PaymentResult paymentResult = paymentApplicationService.processReservationPayment(
+                reservation.getTotalCost(),
+                paymentOptions,
+                request.getPaymentMethod(),
+                buildPaymentMethodDetails(request)
+        );
+
+        if (!paymentResult.isSuccess()) {
+            throw new IllegalArgumentException(paymentResult.getMessage());
+        }
+
+        reservation.setTotalCost(payment.getAmount());
         reservation.confirm();
 
         ParkingReservationEntity savedEntity = reservationRepository.save(
                 ParkingReservationMapper.toEntity(reservation)
         );
 
+
         ParkingReservation savedReservation = ParkingReservationMapper.toDomain(savedEntity);
+
+        String paymentMethod = request.getPaymentMethod().toUpperCase(Locale.ROOT);
+        String paymentAuthorizationCode = "PAY-" + paymentResult.getTransactionId();
+
+        paymentTransactionService.recordTransaction(
+                savedReservation.getId(),
+                savedReservation.getUserId(),
+                PARKING_PROVIDER_PLACEHOLDER_ID,
+                paymentMethod,
+                payment.getAmount(),
+                true,
+                paymentResult.getMessage(),
+                paymentResult.getTransactionId(),
+                paymentAuthorizationCode
+        );
 
         log.info("Parking reservation created id={}", savedReservation.getId());
 
@@ -105,6 +145,13 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
         if (!start.isBefore(end)) {
             throw new IllegalArgumentException("Start date must be before end date");
         }
+
+        Double totalCost = request.getTotalCost();
+        if (totalCost == null || totalCost < 0) {
+            throw new IllegalArgumentException("Parking total cost is required");
+        }
+
+        LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
     }
 
     @Override
@@ -123,6 +170,27 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
                 request.getFacilityAddress(),
                 request.getDurationHours(),
                 request.getTotalCost()
+        );
+    }
+
+    private PaymentApplicationService.PaymentOptions buildPaymentOptions(CreateParkingReservationRequest request) {
+        return new PaymentApplicationService.PaymentOptions(
+                true,
+                PaymentApplicationService.FIXED_SERVICE_FEE_AMOUNT,
+                true,
+                PaymentApplicationService.FIXED_TAX_RATE,
+                request.isIncludeInsuranceFee(),
+                request.getInsuranceFeeAmount(),
+                request.isIncludeDiscount(),
+                request.getDiscountAmount()
+        );
+    }
+
+    private PaymentMethodDetails buildPaymentMethodDetails(CreateParkingReservationRequest request) {
+        return new PaymentMethodDetails(
+                request.getCreditCardNumber(),
+                request.getPaypalEmail(),
+                request.getPaypalPassword()
         );
     }
 

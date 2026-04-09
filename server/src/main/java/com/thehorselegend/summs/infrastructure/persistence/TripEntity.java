@@ -37,6 +37,9 @@ public class TripEntity {
     @Column
     private Long totalDurationMinutes;
 
+    @Column(name = "co2_saved_kg")
+    private Double co2SavedKg;
+
     public TripEntity() {
     }
 
@@ -55,6 +58,26 @@ public class TripEntity {
         this.startTime = startTime;
         this.endTime = endTime;
         this.totalDurationMinutes = totalDurationMinutes;
+        this.co2SavedKg = 0.0;
+    }
+
+    public TripEntity(
+            Long id,
+            Long reservationId,
+            Long vehicleId,
+            Long citizenId,
+            LocalDateTime startTime,
+            LocalDateTime endTime,
+            Long totalDurationMinutes,
+            Double co2SavedKg) {
+        this.id = id;
+        this.reservationId = reservationId;
+        this.vehicleId = vehicleId;
+        this.citizenId = citizenId;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.totalDurationMinutes = totalDurationMinutes;
+        this.co2SavedKg = co2SavedKg;
     }
 
     public Long getId() {
@@ -85,6 +108,10 @@ public class TripEntity {
         return totalDurationMinutes;
     }
 
+    public Double getCo2SavedKg() {
+        return co2SavedKg;
+    }
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -111,5 +138,9 @@ public class TripEntity {
 
     public void setTotalDurationMinutes(Long totalDurationMinutes) {
         this.totalDurationMinutes = totalDurationMinutes;
+    }
+
+    public void setCo2SavedKg(Double co2SavedKg) {
+        this.co2SavedKg = co2SavedKg;
     }
 }

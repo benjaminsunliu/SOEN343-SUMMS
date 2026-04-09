@@ -1,4 +1,4 @@
-import type { ParkingFacility } from "../../utils/api";
+import type { ParkingFacility, ParkingSearchParams } from "../../utils/api";
 import ParkingFacilityCard from "./ParkingFacilityCard";
 
 interface Props {
@@ -8,6 +8,7 @@ interface Props {
   searched: boolean;
   destination: string;
   durationHours: number;
+  searchParams: ParkingSearchParams | null;
 }
 
 function SkeletonCard() {
@@ -34,7 +35,7 @@ function SkeletonCard() {
 }
 
 export default function ParkingResultsList({
-  results, loading, error, searched, destination, durationHours,
+  results, loading, error, searched, destination, durationHours, searchParams,
 }: Props) {
 
   // 1 — Not yet searched
@@ -90,6 +91,7 @@ export default function ParkingResultsList({
             key={facility.facilityId}
             facility={facility}
             durationHours={durationHours}
+            searchParams={searchParams}
           />
         ))}
       </div>

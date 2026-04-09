@@ -19,7 +19,8 @@ public final class TripMapper {
                 trip.getCitizenId(),
                 trip.getStartTime(),
                 trip.getEndTime(),
-                trip.getTotalDurationMinutes()
+                trip.getTotalDurationMinutes(),
+                trip.getCo2SavedKg()
         );
     }
 
@@ -35,7 +36,8 @@ public final class TripMapper {
                 entity.getCitizenId(),
                 entity.getStartTime(),
                 entity.getEndTime(),
-                entity.getTotalDurationMinutes()
+                entity.getTotalDurationMinutes(),
+                entity.getCo2SavedKg()
         );
     }
 }
