@@ -248,7 +248,7 @@ public class VehicleReservationService extends ReservationCreationTemplate<Vehic
         throw new IllegalArgumentException("Vehicle reservation not found");
     }
 
-    private record VehicleReservationSource(
+    static record VehicleReservationSource(
             Vehicle vehicle,
             String city,
             Location endLocation
