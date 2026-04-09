@@ -200,6 +200,21 @@ function AddVehicleForm({
         throw new Error("Invalid number format");
       }
 
+      // Validate latitude and longitude ranges
+      const validationErrors: string[] = [];
+
+      if (latitude < -90 || latitude > 90) {
+        validationErrors.push("Latitude must be between -90 and 90");
+      }
+
+      if (longitude < -180 || longitude > 180) {
+        validationErrors.push("Longitude must be between -180 and 180");
+      }
+
+      if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join(" and "));
+      }
+
       let endpoint = "";
       let body: Record<string, unknown> = {
         location: {
