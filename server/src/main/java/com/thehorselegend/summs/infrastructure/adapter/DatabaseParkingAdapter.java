@@ -12,10 +12,15 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 @Component
 @Primary
 public class DatabaseParkingAdapter implements IParkingService {
+    private static final Set<ReservationStatus> OCCUPYING_STATUSES = Set.of(
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.ACTIVE
+    );
 
     private final ParkingFacilityRepository parkingFacilityRepository;
     private final ParkingReservationRepository parkingReservationRepository;
@@ -63,9 +68,9 @@ public class DatabaseParkingAdapter implements IParkingService {
     }
 
     private ParkingFacilityDTO toDto(ParkingFacility facility, int duration, ParkingSearchRequestDTO request) {
-        int reserved = parkingReservationRepository.countByFacilityIdAndStatus(
+        int reserved = parkingReservationRepository.countByFacilityIdAndStatusIn(
                 facility.getFacilityId(),
-                ReservationStatus.CONFIRMED);
+                OCCUPYING_STATUSES);
 
         int total = facility.getTotalSpots() == null ? 0 : Math.max(0, facility.getTotalSpots());
         int available = Math.max(0, total - reserved);

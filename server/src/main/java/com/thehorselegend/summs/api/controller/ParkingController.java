@@ -2,6 +2,7 @@ package com.thehorselegend.summs.api.controller;
 
 
 import com.thehorselegend.summs.application.service.ParkingSearchService;
+import com.thehorselegend.summs.api.dto.CityParkingAnalyticsResponse;
 import com.thehorselegend.summs.api.dto.ParkingFacilityDTO;
 import com.thehorselegend.summs.api.dto.ParkingFacilityUpsertRequest;
 import com.thehorselegend.summs.api.dto.ParkingCatalogEntryDto;
@@ -88,6 +89,12 @@ public class ParkingController {
     @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<List<ParkingCatalogEntryDto>> listParkingCatalog(Authentication authentication) {
         return ResponseEntity.ok(parkingFacilityService.getCatalogEntriesWithStatus(resolveAuthenticatedUserId(authentication)));
+    }
+
+    @GetMapping("/management/analytics")
+    @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
+    public ResponseEntity<CityParkingAnalyticsResponse> getParkingAnalytics(Authentication authentication) {
+        return ResponseEntity.ok(parkingFacilityService.getProviderAnalytics(resolveAuthenticatedUserId(authentication)));
     }
 
     @PostMapping("/management/catalog/{terrainCode}/add")

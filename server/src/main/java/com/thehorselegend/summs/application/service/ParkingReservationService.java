@@ -31,6 +31,7 @@ import java.util.Locale;
 public class ParkingReservationService {
     private static final DateTimeFormatter CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final long PARKING_PROVIDER_PLACEHOLDER_ID = 0L;
+    private static final String MODIFY_NOT_AUTHORIZED_MESSAGE = "User not authorized to modify this parking reservation";
 
     private final ParkingReservationRepository reservationRepository;
     private final PaymentApplicationService paymentApplicationService;
@@ -109,6 +110,34 @@ public class ParkingReservationService {
         reservationRepository.save(entity);
     }
 
+    @Transactional
+    public ParkingReservationResponse occupyReservation(Long reservationId, Long userId) {
+        ParkingReservationEntity entity = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
+
+        ParkingReservation parkingReservation = ParkingReservationMapper.toDomain(entity);
+        ensureReservationOwnedByUser(parkingReservation, userId);
+        activateDomainReservation(parkingReservation);
+
+        entity.setStatus(parkingReservation.getStatus());
+        ParkingReservationEntity savedEntity = reservationRepository.save(entity);
+        return toResponse(ParkingReservationMapper.toDomain(savedEntity), savedEntity.getCreatedAt());
+    }
+
+    @Transactional
+    public ParkingReservationResponse checkoutReservation(Long reservationId, Long userId) {
+        ParkingReservationEntity entity = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
+
+        ParkingReservation parkingReservation = ParkingReservationMapper.toDomain(entity);
+        ensureReservationOwnedByUser(parkingReservation, userId);
+        completeDomainReservation(parkingReservation);
+
+        entity.setStatus(parkingReservation.getStatus());
+        ParkingReservationEntity savedEntity = reservationRepository.save(entity);
+        return toResponse(ParkingReservationMapper.toDomain(savedEntity), savedEntity.getCreatedAt());
+    }
+
     private ParkingReservation buildParkingReservation(CreateParkingReservationRequest request, Long userId) {
         if (request.getFacilityId() == null) {
             throw new IllegalArgumentException("Facility id is required");
@@ -175,6 +204,34 @@ public class ParkingReservationService {
                 throw new IllegalStateException("Parking reservation cannot be cancelled in its current state");
             }
             throw ex;
+        }
+    }
+
+    private void activateDomainReservation(ParkingReservation reservation) {
+        try {
+            reservation.activate();
+        } catch (IllegalStateException ex) {
+            if ("Only confirmed reservations can be activated".equals(ex.getMessage())) {
+                throw new IllegalStateException("Parking reservation must be confirmed before occupying the spot");
+            }
+            throw ex;
+        }
+    }
+
+    private void completeDomainReservation(ParkingReservation reservation) {
+        try {
+            reservation.complete();
+        } catch (IllegalStateException ex) {
+            if ("Only active reservations can be completed".equals(ex.getMessage())) {
+                throw new IllegalStateException("Parking reservation must be active before checkout");
+            }
+            throw ex;
+        }
+    }
+
+    private void ensureReservationOwnedByUser(ParkingReservation reservation, Long userId) {
+        if (!reservation.getUserId().equals(userId)) {
+            throw new IllegalStateException(MODIFY_NOT_AUTHORIZED_MESSAGE);
         }
     }
 

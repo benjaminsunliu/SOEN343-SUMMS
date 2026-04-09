@@ -4,9 +4,11 @@ import {
   addParkingCatalogEntryForProvider,
   createParkingSpaceForProvider,
   deleteParkingSpaceForProvider,
+  fetchCityParkingAnalytics,
   listParkingCatalogForProvider,
   listParkingSpacesForProvider,
   updateParkingSpaceForProvider,
+  type CityParkingAnalytics,
   type ParkingCatalogEntry,
   type ParkingFacility,
   type ParkingSpaceUpsertRequest,
@@ -37,6 +39,7 @@ export function meta({}: Route.MetaArgs) {
 export default function ProviderParkingPage() {
   const [catalogEntries, setCatalogEntries] = useState<ParkingCatalogEntry[]>([]);
   const [spaces, setSpaces] = useState<ParkingFacility[]>([]);
+  const [parkingAnalytics, setParkingAnalytics] = useState<CityParkingAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +51,32 @@ export default function ProviderParkingPage() {
   const modeLabel = selectedId === null ? "Create Parking Space" : "Edit Parking Space";
 
   useEffect(() => {
-    void loadSpaces();
+    let isMounted = true;
+
+    async function refreshData() {
+      if (!isMounted) {
+        return;
+      }
+      await loadSpaces();
+    }
+
+    void refreshData();
+
+    const refreshIntervalId = window.setInterval(() => {
+      void refreshData();
+    }, 30_000);
+
+    const handleWindowFocus = () => {
+      void refreshData();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(refreshIntervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
   }, []);
 
   const sortedSpaces = useMemo(
@@ -114,21 +142,30 @@ export default function ProviderParkingPage() {
     [addedCatalogEntries, customSpaces],
   );
 
+  const activeParkingReservations = parkingAnalytics?.activeReservations ?? [];
+  const occupiedSpotsCount = Math.max(
+    parkingAnalytics?.occupiedSpaces ?? 0,
+    activeParkingReservations.length,
+  );
+
   async function loadSpaces() {
     setLoading(true);
     setError(null);
     try {
-      const [spaceData, catalogData] = await Promise.all([
+      const [spaceData, catalogData, analyticsData] = await Promise.all([
         listParkingSpacesForProvider(),
         listParkingCatalogForProvider(),
+        fetchCityParkingAnalytics(),
       ]);
 
       setSpaces(spaceData);
       setCatalogEntries(catalogData);
+      setParkingAnalytics(analyticsData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load parking spaces.");
       setSpaces([]);
       setCatalogEntries([]);
+      setParkingAnalytics(null);
     } finally {
       setLoading(false);
     }
@@ -224,6 +261,63 @@ export default function ProviderParkingPage() {
 
       {error && <div className="mb-3 rounded-lg border border-red-500/70 bg-red-500/20 px-4 py-2 text-sm text-red-200">{error}</div>}
       {notice && <div className="mb-3 rounded-lg border border-green-500/70 bg-green-500/20 px-4 py-2 text-sm text-green-200">{notice}</div>}
+
+      <section className="mb-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <DashboardMetricCard label="Managed Facilities" value={String(parkingAnalytics?.totalFacilities ?? 0)} />
+        <DashboardMetricCard label="Total Spots" value={String(parkingAnalytics?.totalSpots ?? 0)} />
+        <DashboardMetricCard label="Reserved Spots" value={String(parkingAnalytics?.reservedSpaces ?? 0)} />
+        <DashboardMetricCard label="Active Rentals" value={String(occupiedSpotsCount)} />
+        <DashboardMetricCard label="Parking Revenue" value={formatCurrency(parkingAnalytics?.totalRevenue ?? 0)} />
+      </section>
+
+      <section className="mb-4 rounded-xl border border-[#2a354a] bg-[#06142b] p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Active Rentals</h2>
+            <p className="text-sm text-gray-400">Parking spaces that are currently occupied.</p>
+          </div>
+          <div className="rounded-lg border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-right">
+            <p className="text-xs uppercase tracking-[0.14em] text-cyan-300">Currently Taken</p>
+            <p className="text-xl font-bold text-white">{occupiedSpotsCount}</p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="text-sm text-gray-400">Loading active parking rentals...</p>
+        ) : activeParkingReservations.length === 0 ? (
+          <p className="text-sm text-gray-400">No parking spaces are currently occupied.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-700">
+                  <th className="px-2 py-2 text-left text-gray-300">Parking Space</th>
+                  <th className="px-2 py-2 text-left text-gray-300">Arrival</th>
+                  <th className="px-2 py-2 text-right text-gray-300">Duration</th>
+                  <th className="px-2 py-2 text-right text-gray-300">Revenue</th>
+                  <th className="px-2 py-2 text-left text-gray-300">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeParkingReservations.map((reservation) => (
+                  <tr key={reservation.reservationId} className="border-b border-gray-800">
+                    <td className="px-2 py-3">
+                      <p className="font-medium text-white">{reservation.facilityName}</p>
+                      <p className="text-xs text-gray-400">{reservation.city}</p>
+                    </td>
+                    <td className="px-2 py-3 text-gray-300">
+                      {reservation.arrivalDate} {reservation.arrivalTime}
+                    </td>
+                    <td className="px-2 py-3 text-right text-gray-300">{reservation.durationHours}h</td>
+                    <td className="px-2 py-3 text-right text-cyan-300">{formatCurrency(reservation.totalCost)}</td>
+                    <td className="px-2 py-3 text-gray-300">{reservation.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.15fr_1.85fr]">
         <article className="rounded-xl border border-[#2a354a] bg-[#06142b] p-4">
@@ -412,6 +506,19 @@ export default function ProviderParkingPage() {
       </section>
     </main>
   );
+}
+
+function DashboardMetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-[#2a354a] bg-[#06142b] p-4">
+      <p className="text-sm text-gray-400">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-cyan-400">{value}</p>
+    </div>
+  );
+}
+
+function formatCurrency(amount: number) {
+  return `$${amount.toFixed(2)}`;
 }
 
 function TextField({

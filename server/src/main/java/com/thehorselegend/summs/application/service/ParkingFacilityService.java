@@ -1,5 +1,8 @@
 package com.thehorselegend.summs.application.service;
 
+import com.thehorselegend.summs.api.dto.CityParkingActiveReservationDto;
+import com.thehorselegend.summs.api.dto.CityParkingAnalyticsResponse;
+import com.thehorselegend.summs.api.dto.CityParkingFacilityAnalyticsDto;
 import com.thehorselegend.summs.api.dto.ParkingCatalogEntryDto;
 import com.thehorselegend.summs.api.dto.ParkingFacilityDTO;
 import com.thehorselegend.summs.api.dto.ParkingFacilityUpsertRequest;
@@ -7,6 +10,7 @@ import com.thehorselegend.summs.api.dto.ParkingSummaryDto;
 import com.thehorselegend.summs.domain.parking.ParkingFacility;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingFacilityRepository;
+import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationEntity;
 import com.thehorselegend.summs.infrastructure.persistence.ParkingReservationRepository;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -19,15 +23,35 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class ParkingFacilityService {
+    private static final DateTimeFormatter ANALYTICS_CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final Set<ReservationStatus> REVENUE_STATUSES = EnumSet.of(
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.ACTIVE,
+            ReservationStatus.COMPLETED,
+            ReservationStatus.EXPIRED
+    );
+    private static final Set<ReservationStatus> RESERVED_STATUSES = EnumSet.of(
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.ACTIVE
+    );
+    private static final Set<ReservationStatus> OCCUPIED_STATUSES = EnumSet.of(ReservationStatus.ACTIVE);
 
     private final ParkingFacilityRepository parkingFacilityRepository;
     private final ParkingReservationRepository parkingReservationRepository;
@@ -164,11 +188,77 @@ public class ParkingFacilityService {
         int reservedSpots = facilities.stream()
                 .map(ParkingFacility::getFacilityId)
                 .filter(id -> id != null)
-                .mapToInt(id -> parkingReservationRepository.countByFacilityIdAndStatus(id, ReservationStatus.CONFIRMED))
+                .mapToInt(id -> parkingReservationRepository.countByFacilityIdAndStatusIn(id, RESERVED_STATUSES))
                 .sum();
 
         int availableSpots = Math.max(0, totalSpots - reservedSpots);
         return new ParkingSummaryDto(totalFacilities, totalSpots, availableSpots, reservedSpots);
+    }
+
+    @Transactional(readOnly = true)
+    public CityParkingAnalyticsResponse getProviderAnalytics(Long providerId) {
+        List<ParkingFacility> facilities = parkingFacilityRepository.findByProviderIdAndActiveTrue(providerId);
+        if (facilities.isEmpty()) {
+            return new CityParkingAnalyticsResponse(0, 0, 0, 0, 0, 0.0, List.of(), List.of());
+        }
+
+        List<Long> facilityIds = facilities.stream()
+                .map(ParkingFacility::getFacilityId)
+                .filter(id -> id != null)
+                .toList();
+
+        List<ParkingReservationEntity> reservations = facilityIds.isEmpty()
+                ? List.of()
+                : parkingReservationRepository.findByFacilityIdInOrderByCreatedAtDesc(facilityIds);
+
+        Map<Long, List<ParkingReservationEntity>> reservationsByFacility = new HashMap<>();
+        for (ParkingReservationEntity reservation : reservations) {
+            reservationsByFacility
+                    .computeIfAbsent(reservation.getFacilityId(), ignored -> new ArrayList<>())
+                    .add(reservation);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        List<CityParkingFacilityAnalyticsDto> facilityAnalytics = facilities.stream()
+                .map(facility -> toFacilityAnalytics(
+                        facility,
+                        reservationsByFacility.getOrDefault(facility.getFacilityId(), List.of()),
+                        now))
+                .sorted(Comparator.comparing(CityParkingFacilityAnalyticsDto::name, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        int totalSpots = facilityAnalytics.stream()
+                .mapToInt(CityParkingFacilityAnalyticsDto::totalSpots)
+                .sum();
+        int reservedSpaces = facilityAnalytics.stream()
+                .mapToInt(CityParkingFacilityAnalyticsDto::reservedSpaces)
+                .sum();
+        int occupiedSpaces = facilityAnalytics.stream()
+                .mapToInt(CityParkingFacilityAnalyticsDto::occupiedSpaces)
+                .sum();
+        int availableSpots = facilityAnalytics.stream()
+                .mapToInt(CityParkingFacilityAnalyticsDto::availableSpots)
+                .sum();
+        double totalRevenue = facilityAnalytics.stream()
+                .mapToDouble(CityParkingFacilityAnalyticsDto::totalRevenue)
+                .sum();
+
+        List<CityParkingActiveReservationDto> activeReservations = reservations.stream()
+                .filter(reservation -> isCurrentlyOccupied(reservation, now))
+                .sorted(Comparator.comparing(this::resolveReservationStart, Comparator.nullsLast(Comparator.naturalOrder())))
+                .map(this::toActiveReservationDto)
+                .toList();
+
+        return new CityParkingAnalyticsResponse(
+                facilities.size(),
+                totalSpots,
+                reservedSpaces,
+                occupiedSpaces,
+                availableSpots,
+                totalRevenue,
+                facilityAnalytics,
+                activeReservations
+        );
     }
 
     @Transactional
@@ -250,9 +340,9 @@ public class ParkingFacilityService {
     }
 
     private ParkingFacilityDTO toDto(ParkingFacility facility) {
-        int reserved = parkingReservationRepository.countByFacilityIdAndStatus(
+        int reserved = parkingReservationRepository.countByFacilityIdAndStatusIn(
                 facility.getFacilityId(),
-                ReservationStatus.CONFIRMED);
+                RESERVED_STATUSES);
         int total = facility.getTotalSpots() == null ? 0 : Math.max(facility.getTotalSpots(), 0);
         int available = Math.max(0, total - reserved);
 
@@ -297,6 +387,94 @@ public class ParkingFacilityService {
             tags.add("Security");
         }
         return tags;
+    }
+
+    private CityParkingFacilityAnalyticsDto toFacilityAnalytics(
+            ParkingFacility facility,
+            List<ParkingReservationEntity> reservations,
+            LocalDateTime now) {
+        int totalSpots = facility.getTotalSpots() == null ? 0 : Math.max(facility.getTotalSpots(), 0);
+        int reservedSpaces = (int) reservations.stream()
+                .filter(reservation -> countsTowardReservedSpaces(reservation, now))
+                .count();
+        int occupiedSpaces = (int) reservations.stream()
+                .filter(reservation -> isCurrentlyOccupied(reservation, now))
+                .count();
+        int availableSpots = Math.max(0, totalSpots - reservedSpaces);
+        double totalRevenue = reservations.stream()
+                .filter(this::countsTowardRevenue)
+                .mapToDouble(reservation -> reservation.getTotalCost() == null ? 0.0 : reservation.getTotalCost())
+                .sum();
+
+        return new CityParkingFacilityAnalyticsDto(
+                facility.getFacilityId(),
+                facility.getName(),
+                facility.getCity(),
+                totalSpots,
+                reservedSpaces,
+                occupiedSpaces,
+                availableSpots,
+                totalRevenue
+        );
+    }
+
+    private CityParkingActiveReservationDto toActiveReservationDto(ParkingReservationEntity reservation) {
+        LocalDateTime confirmedAt = reservation.getCreatedAt() == null ? LocalDateTime.now() : reservation.getCreatedAt();
+        String status = reservation.getStatus() == null ? ReservationStatus.CONFIRMED.name() : reservation.getStatus().name();
+
+        return new CityParkingActiveReservationDto(
+                reservation.getId(),
+                reservation.getFacilityId(),
+                reservation.getFacilityName(),
+                reservation.getCity(),
+                reservation.getArrivalDate(),
+                reservation.getArrivalTime(),
+                reservation.getDurationHours(),
+                reservation.getTotalCost(),
+                status,
+                confirmedAt.format(ANALYTICS_CONFIRMED_AT_FORMATTER)
+        );
+    }
+
+    private boolean countsTowardRevenue(ParkingReservationEntity reservation) {
+        return reservation.getStatus() != null
+                && REVENUE_STATUSES.contains(reservation.getStatus())
+                && reservation.getTotalCost() != null;
+    }
+
+    private boolean countsTowardReservedSpaces(ParkingReservationEntity reservation, LocalDateTime now) {
+        return reservation.getStatus() != null
+                && RESERVED_STATUSES.contains(reservation.getStatus());
+    }
+
+    private boolean isCurrentlyOccupied(ParkingReservationEntity reservation, LocalDateTime now) {
+        return reservation.getStatus() != null
+                && OCCUPIED_STATUSES.contains(reservation.getStatus());
+    }
+
+    private LocalDateTime resolveReservationStart(ParkingReservationEntity reservation) {
+        if (reservation.getArrivalDate() == null || reservation.getArrivalTime() == null) {
+            return null;
+        }
+
+        try {
+            return LocalDateTime.of(
+                    LocalDate.parse(reservation.getArrivalDate()),
+                    LocalTime.parse(reservation.getArrivalTime())
+            );
+        } catch (DateTimeException ex) {
+            return null;
+        }
+    }
+
+    private LocalDateTime resolveReservationEnd(ParkingReservationEntity reservation) {
+        LocalDateTime start = resolveReservationStart(reservation);
+        if (start == null) {
+            return null;
+        }
+
+        int durationHours = reservation.getDurationHours() == null ? 0 : Math.max(reservation.getDurationHours(), 0);
+        return start.plusHours(durationHours);
     }
 
     private Double optionalDouble(CSVRecord row, List<String> normalizedHeaders, String... candidates) {

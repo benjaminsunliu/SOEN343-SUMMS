@@ -13,8 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +31,11 @@ public class TransitSearchService {
     public List<TransitRouteDTO> searchRoutes(TransitSearchRequestDTO request) {
         try {
             List<TransitRouteDTO> results = transitService.searchRoutes(request);
+            Set<String> returnedTransitTypes = results.stream()
+                    .map(TransitRouteDTO::getType)
+                    .map(this::normalizeValue)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
 
             searchLogRepository.save(TransitSearchLogEntity.builder()
                 .origin(request.getOrigin())
@@ -34,7 +43,7 @@ public class TransitSearchService {
                 .transitType(request.getType())
                 .date(request.getDate())
                 .time(request.getTime())
-                .resultsReturned(results.size())
+                .returnedTransitTypes(returnedTransitTypes)
                 .build());
 
             if (!results.isEmpty()) {

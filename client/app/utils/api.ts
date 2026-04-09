@@ -149,6 +149,41 @@ export interface ParkingCatalogEntry {
   addedFacilityId: number | null;
 }
 
+export interface CityParkingFacilityAnalytics {
+  facilityId: number;
+  name: string;
+  city: string;
+  totalSpots: number;
+  reservedSpaces: number;
+  occupiedSpaces: number;
+  availableSpots: number;
+  totalRevenue: number;
+}
+
+export interface CityParkingActiveReservation {
+  reservationId: number;
+  facilityId: number;
+  facilityName: string;
+  city: string;
+  arrivalDate: string;
+  arrivalTime: string;
+  durationHours: number;
+  totalCost: number;
+  status: string;
+  confirmedAt: string;
+}
+
+export interface CityParkingAnalytics {
+  totalFacilities: number;
+  totalSpots: number;
+  reservedSpaces: number;
+  occupiedSpaces: number;
+  availableSpots: number;
+  totalRevenue: number;
+  facilities: CityParkingFacilityAnalytics[];
+  activeReservations: CityParkingActiveReservation[];
+}
+
 //Parking API calls
 
 export async function searchParking(
@@ -212,6 +247,36 @@ export async function cancelParkingReservation(reservationId: number): Promise<v
   }
 }
 
+export async function occupyParkingReservation(
+  reservationId: number,
+): Promise<ParkingReservationResponse> {
+  const res = await apiFetch(`/api/parking/reservations/${reservationId}/occupy`, {
+    method: "POST",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Could not occupy parking spot");
+  }
+
+  return res.json();
+}
+
+export async function checkoutParkingReservation(
+  reservationId: number,
+): Promise<ParkingReservationResponse> {
+  const res = await apiFetch(`/api/parking/reservations/${reservationId}/checkout`, {
+    method: "POST",
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Could not check out of parking spot");
+  }
+
+  return res.json();
+}
+
 export async function listParkingSpacesForProvider(): Promise<ParkingFacility[]> {
   const res = await apiFetch("/api/parking/management/spaces");
   if (!res.ok) {
@@ -227,6 +292,16 @@ export async function listParkingCatalogForProvider(): Promise<ParkingCatalogEnt
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.message ?? "Unable to load parking catalog");
+  }
+
+  return res.json();
+}
+
+export async function fetchCityParkingAnalytics(): Promise<CityParkingAnalytics> {
+  const res = await apiFetch("/api/parking/management/analytics");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load city parking analytics");
   }
 
   return res.json();
@@ -392,6 +467,7 @@ export interface TransitResultLineMetric {
 }
 
 export interface TransitAnalyticsResponse {
+  totalTrips: number;
   totalSearches: number;
   topOrigins: TransitTopOriginMetric[];
   topDestinations: TransitTopDestinationMetric[];

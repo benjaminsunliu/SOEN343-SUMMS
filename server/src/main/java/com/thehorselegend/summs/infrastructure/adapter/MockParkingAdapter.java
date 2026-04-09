@@ -13,8 +13,12 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor  
 public class MockParkingAdapter implements IParkingService {
+    private static final Set<ReservationStatus> OCCUPYING_STATUSES = EnumSet.of(
+            ReservationStatus.CONFIRMED,
+            ReservationStatus.ACTIVE
+    );
 
-    // Injected so we can subtract confirmed bookings from available spots
+    // Injected so we can subtract currently claimed spots from available spots
     private final ParkingReservationRepository reservationRepository;
 
     private static final List<ParkingFacilityDTO> MOCK_FACILITIES = List.of(
@@ -69,9 +73,9 @@ public class MockParkingAdapter implements IParkingService {
         return MOCK_FACILITIES.stream()
                 .filter(f -> f.getPricePerHour() <= maxPrice)
                 .map(f -> {
-                    // Count confirmed reservations for this facility and subtract
+                    // Count confirmed or occupied reservations for this facility and subtract
                     int booked = reservationRepository
-                            .countByFacilityIdAndStatus(f.getFacilityId(), ReservationStatus.CONFIRMED);
+                            .countByFacilityIdAndStatusIn(f.getFacilityId(), OCCUPYING_STATUSES);
                     int realAvailable = Math.max(0, f.getAvailableSpots() - booked);
 
                     // Recalculate availability status based on real count

@@ -65,6 +65,7 @@ public class TransitController {
     public ResponseEntity<Map<String, Object>> getTransitAnalytics() {
         Map<String, Object> analytics = new LinkedHashMap<>();
 
+        analytics.put("totalTrips",       searchResultRepository.count());
         analytics.put("totalSearches",    searchLogRepository.count());
         analytics.put("topOrigins",       searchLogRepository.findTopOrigins().stream()
             .limit(5)
@@ -78,7 +79,7 @@ public class TransitController {
             .map(r -> Map.of("type", r[0], "count", r[1]))
             .collect(java.util.stream.Collectors.toList()));
 
-        analytics.put("topResultTransitTypes", searchResultRepository.findTopResultTransitTypes().stream()
+        analytics.put("topResultTransitTypes", searchLogRepository.findTopReturnedTransitTypes().stream()
             .limit(5)
             .map(r -> Map.of("type", r[0], "count", r[1]))
             .collect(java.util.stream.Collectors.toList()));

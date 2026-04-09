@@ -3,9 +3,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   apiFetch,
+  fetchCityParkingAnalytics,
   fetchParkingSummary,
   listActiveParkingFacilities,
   listParkingReservations,
+  type CityParkingAnalytics,
   type ParkingFacility,
   type ParkingSummary,
   type ParkingReservationResponse,
@@ -70,6 +72,7 @@ export default function DashboardPage() {
   const [reservations, setReservations] = useState<BookingSummary[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTripSummary | null>(null);
   const [parkingSummary, setParkingSummary] = useState<ParkingSummary | null>(null);
+  const [cityParkingAnalytics, setCityParkingAnalytics] = useState<CityParkingAnalytics | null>(null);
   const [isLoadingReservations, setIsLoadingReservations] = useState(true);
   const [isLoadingMap, setIsLoadingMap] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -90,6 +93,9 @@ export default function DashboardPage() {
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [userCo2Saved, setUserCo2Saved] = useState<number | null>(null);
   const [isLoadingCo2, setIsLoadingCo2] = useState(false);
+  const normalizedRole = authUser?.role.trim().toUpperCase() ?? null;
+  const isCityParkingDashboard =
+    normalizedRole === "CITY_PROVIDER" || normalizedRole === "ADMIN";
 
   useEffect(() => {
     // Fetch live map data (vehicles + parking spots)
@@ -172,7 +178,10 @@ export default function DashboardPage() {
           }));
 
         const confirmedParkingBookings: BookingSummary[] = parkingReservations
-          .filter((reservation) => reservation.status.toUpperCase() === "CONFIRMED")
+          .filter((reservation) => {
+            const normalizedStatus = reservation.status.toUpperCase();
+            return normalizedStatus === "CONFIRMED" || normalizedStatus === "ACTIVE";
+          })
           .map((reservation) => ({
             reservationId: reservation.reservationId,
             reservationType: "PARKING",
@@ -223,6 +232,47 @@ export default function DashboardPage() {
       isMounted = false;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    if (!isCityParkingDashboard) {
+      setCityParkingAnalytics(null);
+      return;
+    }
+
+    let isMounted = true;
+
+    async function loadCityParkingAnalytics() {
+      try {
+        const analytics = await fetchCityParkingAnalytics();
+        if (!isMounted) {
+          return;
+        }
+        setCityParkingAnalytics(analytics);
+      } catch {
+        if (isMounted) {
+          setCityParkingAnalytics(null);
+        }
+      }
+    }
+
+    void loadCityParkingAnalytics();
+
+    const refreshIntervalId = window.setInterval(() => {
+      void loadCityParkingAnalytics();
+    }, 30_000);
+
+    const handleWindowFocus = () => {
+      void loadCityParkingAnalytics();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(refreshIntervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, [isCityParkingDashboard]);
 
   useEffect(() => {
     let isMounted = true;
@@ -431,10 +481,17 @@ export default function DashboardPage() {
     return counts;
   }, [availableVehicles]);
 
+  const dashboardActiveRentals = isCityParkingDashboard
+    ? Math.max(
+        cityParkingAnalytics?.occupiedSpaces ?? 0,
+        cityParkingAnalytics?.activeReservations.length ?? 0,
+      )
+    : activeReservations;
+
   const statCards = [
     {
       label: "Active Rentals",
-      value: activeReservations === null ? "--" : String(activeReservations),
+      value: dashboardActiveRentals === null ? "--" : String(dashboardActiveRentals),
       valueClass: "text-cyan-400",
     },
     {
