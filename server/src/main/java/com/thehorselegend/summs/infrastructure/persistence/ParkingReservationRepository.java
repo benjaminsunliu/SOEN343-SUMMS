@@ -1,25 +1,19 @@
 package com.thehorselegend.summs.infrastructure.persistence;
 
-import org.springframework.data.jpa.repository.JpaRepository;
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Set;
 
+@Repository
 public interface ParkingReservationRepository extends JpaRepository<ParkingReservationEntity, Long> {
+    int countByFacilityIdAndStatus(Long facilityId, ReservationStatus status);
 
-    /**
-     * Retrieves all parking reservations made by a specific user, ordered from newest to oldest.
-     * @param userId the ID of the user
-     * @return a list of ParkingReservationEntity objects for that user
-     */
+    int countByFacilityIdAndStatusIn(Long facilityId, Set<ReservationStatus> statuses);
+
     List<ParkingReservationEntity> findByUserIdOrderByCreatedAtDesc(Long userId);
 
-    /**
-     * Counts parking reservations for a facility with a specific status.
-     * @param facilityId the ID of the parking facility
-     * @param status the reservation status to filter by
-     * @return the number of matching parking reservations
-     */
-    long countByReservableIdAndStatus(Long facilityId, ReservationStatus status);
+    List<ParkingReservationEntity> findByFacilityIdInOrderByCreatedAtDesc(List<Long> facilityIds);
 }

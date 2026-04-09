@@ -118,6 +118,38 @@ public class ParkingReservationService extends ReservationCreationTemplate<Parki
         reservationRepository.save(entity);
     }
 
+    @Transactional
+    public ParkingReservationResponse occupyReservation(Long reservationId, Long userId) {
+        ParkingReservationEntity entity = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
+
+        ParkingReservation reservation = ParkingReservationMapper.toDomain(entity);
+        ensureReservationOwnedByUser(reservation, userId);
+
+        activateDomainReservation(reservation);
+
+        entity.setStatus(reservation.getStatus());
+        reservationRepository.save(entity);
+
+        return toResponse(reservation, entity.getCreatedAt());
+    }
+
+    @Transactional
+    public ParkingReservationResponse checkoutReservation(Long reservationId, Long userId) {
+        ParkingReservationEntity entity = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found"));
+
+        ParkingReservation reservation = ParkingReservationMapper.toDomain(entity);
+        ensureReservationOwnedByUser(reservation, userId);
+
+        completeDomainReservation(reservation);
+
+        entity.setStatus(reservation.getStatus());
+        reservationRepository.save(entity);
+
+        return toResponse(reservation, entity.getCreatedAt());
+    }
+
     @Override
     protected void validateAvailability(
             ParkingReservationSource source,

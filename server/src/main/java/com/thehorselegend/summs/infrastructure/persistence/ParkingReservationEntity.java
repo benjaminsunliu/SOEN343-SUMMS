@@ -2,102 +2,54 @@ package com.thehorselegend.summs.infrastructure.persistence;
 
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
 import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "parking_reservations")
-@PrimaryKeyJoinColumn(name = "reservation_id")
-public class ParkingReservationEntity extends ReservationEntity {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class ParkingReservationEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @Column(name = "facility_name")
+    // Which facility was booked
+    @Column(nullable = false)
+    private Long facilityId;
+
+    @Column(nullable = false)
     private String facilityName;
 
-    @Column(name = "facility_address")
     private String facilityAddress;
+    private String city;
 
-    @Column(name = "duration_hours")
+    // Trip details
+    private String  arrivalDate;
+    private String  arrivalTime;
     private Integer durationHours;
+    private Double  totalCost;
 
-    @Column(name = "total_cost")
-    private Double totalCost;
+    // Who booked it — userId from auth
+    @Column(nullable = false)
+    private Long userId;
 
-    @Column(name = "created_at")
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 20)
+    private ReservationStatus status;
+
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    public ParkingReservationEntity() {
-        super();
-    }
-
-    public ParkingReservationEntity(
-            Long id,
-            Long userId,
-            Long reservableId,
-            LocalDateTime startDate,
-            LocalDateTime endDate,
-            String city,
-            ReservationStatus status,
-            String facilityName,
-            String facilityAddress,
-            Integer durationHours,
-            Double totalCost,
-            LocalDateTime createdAt
-    ) {
-        super(id, userId, reservableId, startDate, endDate, city, status);
-        this.facilityName = facilityName;
-        this.facilityAddress = facilityAddress;
-        this.durationHours = durationHours;
-        this.totalCost = totalCost;
-        this.createdAt = createdAt;
-    }
-
-    @jakarta.persistence.PrePersist
+    @PrePersist
     public void prePersist() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (getStatus() == null) {
-            setStatus(ReservationStatus.CONFIRMED);
-        }
-    }
-
-    public String getFacilityName() {
-        return facilityName;
-    }
-
-    public void setFacilityName(String facilityName) {
-        this.facilityName = facilityName;
-    }
-
-    public String getFacilityAddress() {
-        return facilityAddress;
-    }
-
-    public void setFacilityAddress(String facilityAddress) {
-        this.facilityAddress = facilityAddress;
-    }
-
-    public Integer getDurationHours() {
-        return durationHours;
-    }
-
-    public void setDurationHours(Integer durationHours) {
-        this.durationHours = durationHours;
-    }
-
-    public Double getTotalCost() {
-        return totalCost;
-    }
-
-    public void setTotalCost(Double totalCost) {
-        this.totalCost = totalCost;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (status == null)    status = ReservationStatus.CONFIRMED;
     }
 }

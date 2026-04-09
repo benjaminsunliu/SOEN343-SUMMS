@@ -74,9 +74,9 @@ public class MockParkingAdapter implements IParkingService {
                 .filter(f -> f.getPricePerHour() <= maxPrice)
                 .map(f -> {
                     // Count confirmed reservations for this facility and subtract
-                    long booked = reservationRepository
-                            .countByReservableIdAndStatus(f.getFacilityId(), ReservationStatus.CONFIRMED);
-                    int realAvailable = (int) Math.max(0L, f.getAvailableSpots() - booked);
+                    int booked = reservationRepository
+                            .countByFacilityIdAndStatus(f.getFacilityId(), ReservationStatus.CONFIRMED);
+                    int realAvailable = Math.max(0, f.getAvailableSpots() - booked);
 
                     // Recalculate availability status based on real count
                     String status;
