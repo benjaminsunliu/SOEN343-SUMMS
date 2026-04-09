@@ -97,6 +97,9 @@ class ParkingReservationServiceTest {
                     return entity;
                 });
 
+        when(parkingReservationRepository.findById(11L))
+                .thenReturn(Optional.of(savedEntity));
+
         ParkingReservationResponse response = parkingReservationService.createReservation(request, 5L);
 
         ArgumentCaptor<ParkingReservationEntity> reservationCaptor =

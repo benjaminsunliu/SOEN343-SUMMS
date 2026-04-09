@@ -29,8 +29,7 @@ import java.util.Locale;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ParkingReservationService extends ReservationCreationTemplate<CreateParkingReservationRequest, ParkingReservation> {
-
+public class ParkingReservationService extends ReservationCreationTemplate<ParkingReservationService.ParkingReservationSource, ParkingReservation> {
     private static final DateTimeFormatter CONFIRMED_AT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     private static final long PARKING_PROVIDER_PLACEHOLDER_ID = 0L;
@@ -50,12 +49,10 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
         LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
         LocalDateTime endDate = startDate.plusHours(resolveDurationHours(request.getDurationHours()));
 
-        validateAvailability(request, startDate, endDate);
-        ParkingReservation reservation = buildReservation(request, userId, startDate, endDate);
         PaymentApplicationService.PaymentOptions paymentOptions = buildPaymentOptions(request);
-        Payment payment = paymentApplicationService.buildPayment(reservation.getTotalCost(), paymentOptions);
+        Payment payment = paymentApplicationService.buildPayment(request.getTotalCost(), paymentOptions);
         PaymentResult paymentResult = paymentApplicationService.processReservationPayment(
-                reservation.getTotalCost(),
+                request.getTotalCost(),
                 paymentOptions,
                 request.getPaymentMethod(),
                 buildPaymentMethodDetails(request)
@@ -65,15 +62,12 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
             throw new IllegalArgumentException(paymentResult.getMessage());
         }
 
-        reservation.setTotalCost(payment.getAmount());
-        reservation.confirm();
-
-        ParkingReservationEntity savedEntity = reservationRepository.save(
-                ParkingReservationMapper.toEntity(reservation)
+        ParkingReservation savedReservation = createReservation(
+                new ParkingReservationSource(request, payment.getAmount()),
+                userId,
+                startDate,
+                endDate
         );
-
-
-        ParkingReservation savedReservation = ParkingReservationMapper.toDomain(savedEntity);
 
         String paymentMethod = request.getPaymentMethod().toUpperCase(Locale.ROOT);
         String paymentAuthorizationCode = "PAY-" + paymentResult.getTransactionId();
@@ -92,10 +86,10 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
 
         log.info("Parking reservation created id={}", savedReservation.getId());
 
-        return toResponse(
-                savedReservation,
-                savedEntity.getCreatedAt() != null ? savedEntity.getCreatedAt() : LocalDateTime.now()
-        );
+        ParkingReservationEntity savedEntity = reservationRepository.findById(savedReservation.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Parking reservation not found after save"));
+
+        return toResponse(savedReservation, savedEntity.getCreatedAt());
     }
 
     @Transactional(readOnly = true)
@@ -125,10 +119,12 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
 
     @Override
     protected void validateAvailability(
-            CreateParkingReservationRequest request,
+            ParkingReservationSource source,
             LocalDateTime start,
             LocalDateTime end
     ) {
+        CreateParkingReservationRequest request = source.request();
+
         if (request.getFacilityId() == null) {
             throw new IllegalArgumentException("Facility id is required");
         }
@@ -146,21 +142,22 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
             throw new IllegalArgumentException("Start date must be before end date");
         }
 
-        Double totalCost = request.getTotalCost();
-        if (totalCost == null || totalCost < 0) {
+        Double totalCost = source.finalTotalCost();
+        if (totalCost < 0) {
             throw new IllegalArgumentException("Parking total cost is required");
         }
-
-        LocalDateTime startDate = parseArrivalDateTime(request.getArrivalDate(), request.getArrivalTime());
     }
 
     @Override
     protected ParkingReservation buildReservation(
-            CreateParkingReservationRequest request,
+            ParkingReservationSource source,
             Long userId,
             LocalDateTime start,
-            LocalDateTime end) {
-        return new ParkingReservation(
+            LocalDateTime end
+    ) {
+        CreateParkingReservationRequest request = source.request();
+
+        ParkingReservation reservation = new ParkingReservation(
                 userId,
                 request.getFacilityId(),
                 start,
@@ -169,8 +166,11 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
                 request.getFacilityName(),
                 request.getFacilityAddress(),
                 request.getDurationHours(),
-                request.getTotalCost()
+                source.finalTotalCost()
         );
+
+        reservation.confirm();
+        return reservation;
     }
 
     private PaymentApplicationService.PaymentOptions buildPaymentOptions(CreateParkingReservationRequest request) {
@@ -260,5 +260,11 @@ public class ParkingReservationService extends ReservationCreationTemplate<Creat
                 .status(status.name())
                 .confirmedAt(confirmedAt.format(CONFIRMED_AT_FORMATTER))
                 .build();
+    }
+
+    public static record ParkingReservationSource(
+            CreateParkingReservationRequest request,
+            double finalTotalCost
+    ) {
     }
 }
