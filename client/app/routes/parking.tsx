@@ -29,6 +29,35 @@ function useParkingSearch() {
   const [duration, setDuration] = useState(6);
   const [searchParams, setSearchParams] = useState<ParkingSearchParams | null>(null);
 
+  const applyClientFilters = useCallback(
+    (facilities: ParkingFacility[], params: ParkingSearchParams) => {
+      const normalizedDestination = params.destination.trim().toLowerCase();
+
+      return facilities.filter((facility) => {
+        const hasAvailability = facility.availableSpots > 0;
+        if (!hasAvailability) {
+          return false;
+        }
+
+        const withinPrice =
+          Number.isFinite(params.maxPricePerHour) && params.maxPricePerHour > 0
+            ? facility.pricePerHour <= params.maxPricePerHour
+            : true;
+        if (!withinPrice) {
+          return false;
+        }
+
+        if (!normalizedDestination) {
+          return true;
+        }
+
+        const searchableText = `${facility.name} ${facility.address} ${facility.city}`.toLowerCase();
+        return searchableText.includes(normalizedDestination);
+      });
+    },
+    [],
+  );
+
   const loadAvailableProviderInventory = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -50,21 +79,21 @@ function useParkingSearch() {
   }, []);
 
   const search = useCallback(async (params: ParkingSearchParams) => {
-    if (!params.destination.trim()) {
-      await loadAvailableProviderInventory();
-      return;
-    }
+    const normalizedParams: ParkingSearchParams = {
+      ...params,
+      destination: params.destination.trim(),
+    };
 
     setLoading(true);
     setError(null);
     setSearched(true);
-    setDest(params.destination);
-    setDuration(params.durationHours);
-    setSearchParams(params);
+    setDest(normalizedParams.destination);
+    setDuration(normalizedParams.durationHours);
+    setSearchParams(normalizedParams);
 
     try {
-      const data = await searchParking(params);
-      setResults(data);
+      const data = await searchParking(normalizedParams);
+      setResults(applyClientFilters(data, normalizedParams));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Parking service unavailable.";
       setError(msg);
@@ -72,7 +101,7 @@ function useParkingSearch() {
     } finally {
       setLoading(false);
     }
-  }, [loadAvailableProviderInventory]);
+  }, [applyClientFilters]);
 
   const reset = useCallback(() => {
     void loadAvailableProviderInventory();
