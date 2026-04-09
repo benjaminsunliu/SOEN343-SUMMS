@@ -69,6 +69,19 @@ export default function ProviderParkingPage() {
     return map;
   }, [sortedSpaces]);
 
+  const catalogBackedFacilityIds = useMemo(() => {
+    return new Set(
+      catalogEntries
+        .filter((entry) => entry.added && entry.addedFacilityId !== null)
+        .map((entry) => entry.addedFacilityId as number),
+    );
+  }, [catalogEntries]);
+
+  const customSpaces = useMemo(
+    () => sortedSpaces.filter((space) => !catalogBackedFacilityIds.has(space.facilityId)),
+    [catalogBackedFacilityIds, sortedSpaces],
+  );
+
   async function loadSpaces() {
     setLoading(true);
     setError(null);
@@ -230,8 +243,8 @@ export default function ProviderParkingPage() {
 
           {loading ? (
             <p className="text-sm text-gray-400">Loading parking spaces...</p>
-          ) : sortedCatalog.length === 0 ? (
-            <p className="text-sm text-gray-400">No parking catalog entries found.</p>
+          ) : sortedCatalog.length === 0 && customSpaces.length === 0 ? (
+            <p className="text-sm text-gray-400">No parking spaces found.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -310,6 +323,42 @@ export default function ProviderParkingPage() {
                       </td>
                     </tr>
                   )})}
+                  {customSpaces.map((space) => (
+                    <tr key={`custom-${space.facilityId}`} className="border-b border-gray-800">
+                      <td className="px-2 py-2">
+                        <p className="font-medium text-white">{space.name}</p>
+                        <p className="text-xs text-gray-400">{space.address}</p>
+                        <p className="text-xs text-gray-500">Custom</p>
+                      </td>
+                      <td className="px-2 py-2 text-gray-300">{space.city}</td>
+                      <td className="px-2 py-2 text-gray-300">${space.pricePerHour.toFixed(2)}/h</td>
+                      <td className="px-2 py-2">
+                        <span className="rounded border border-cyan-500/60 bg-cyan-500/20 px-2 py-1 text-xs font-semibold text-cyan-300">
+                          Custom
+                        </span>
+                      </td>
+                      <td className="px-2 py-2">
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(space)}
+                            className="rounded border border-cyan-500 px-2 py-1 text-xs text-cyan-300 hover:bg-cyan-500/20"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleDelete(space.facilityId);
+                            }}
+                            className="rounded border border-red-500 px-2 py-1 text-xs text-red-300 hover:bg-red-500/20"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
