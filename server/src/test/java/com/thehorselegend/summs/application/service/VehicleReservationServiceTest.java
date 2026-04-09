@@ -90,9 +90,13 @@ class VehicleReservationServiceTest {
 
     @Test
     void testCreateReservation() {
-        VehicleReservation created = reservationService.createReservation(
-                vehicle,
+        when(reservationRepository.findByReservableId(vehicleId)).thenReturn(List.of());
+
+        VehicleReservation created = reservationService.reserveVehicle(
                 userId,
+                vehicleId,
+                "CITY",
+                end,
                 startTime,
                 endTime
         );
