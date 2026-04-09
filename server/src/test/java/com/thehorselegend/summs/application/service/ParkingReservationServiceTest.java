@@ -67,11 +67,12 @@ class ParkingReservationServiceTest {
         request.setArrivalTime("14:00");
         request.setDurationHours(4);
         request.setTotalCost(18.0);
-        request.setPaymentMethod("CREDIT");
+        request.setPaymentMethod("CREDIT_CARD");
         request.setIncludeServiceFee(false);
         request.setServiceFeeAmount(2.5);
         request.setIncludeTax(false);
         request.setTaxRate(0.15);
+        request.setCreditCardNumber("12345678");
 
         ParkingReservationEntity savedEntity = new ParkingReservationEntity(
                 11L,
