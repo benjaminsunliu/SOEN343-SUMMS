@@ -365,6 +365,41 @@ export interface TransitLineStatus {
   lineColor:     string;
 }
 
+export interface TransitTopOriginMetric {
+  origin: string;
+  count: number;
+}
+
+export interface TransitTopDestinationMetric {
+  destination: string;
+  count: number;
+}
+
+export interface TransitSearchTypeMetric {
+  type: string;
+  count: number;
+}
+
+export interface TransitResultTypeMetric {
+  type: string;
+  count: number;
+}
+
+export interface TransitResultLineMetric {
+  lineNumber: string;
+  lineName: string;
+  count: number;
+}
+
+export interface TransitAnalyticsResponse {
+  totalSearches: number;
+  topOrigins: TransitTopOriginMetric[];
+  topDestinations: TransitTopDestinationMetric[];
+  searchesByType: TransitSearchTypeMetric[];
+  topResultTransitTypes: TransitResultTypeMetric[];
+  topResultLines: TransitResultLineMetric[];
+}
+
 //Transit API calls 
 
 export async function searchTransitRoutes(
@@ -389,5 +424,15 @@ export async function searchTransitRoutes(
 export async function fetchTransitLineStatuses(): Promise<TransitLineStatus[]> {
   const res = await apiFetch("/api/transit/status");
   if (!res.ok) throw new Error("Could not load line statuses");
+  return res.json();
+}
+
+export async function fetchTransitAnalytics(): Promise<TransitAnalyticsResponse> {
+  const res = await apiFetch("/api/transit/analytics");
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Could not load transit analytics");
+  }
+
   return res.json();
 }

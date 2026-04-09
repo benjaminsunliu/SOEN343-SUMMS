@@ -5,6 +5,8 @@ import com.thehorselegend.summs.api.dto.TransitRouteDTO;
 import com.thehorselegend.summs.api.dto.TransitSearchRequestDTO;
 import com.thehorselegend.summs.infrastructure.persistence.TransitSearchLogEntity;
 import com.thehorselegend.summs.infrastructure.persistence.TransitSearchLogRepository;
+import com.thehorselegend.summs.infrastructure.persistence.TransitSearchResultEntity;
+import com.thehorselegend.summs.infrastructure.persistence.TransitSearchResultRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -19,6 +22,7 @@ import java.util.List;
 public class TransitSearchService {
     private final TransitService transitService;
     private final TransitSearchLogRepository searchLogRepository;
+    private final TransitSearchResultRepository searchResultRepository;
 
     public List<TransitRouteDTO> searchRoutes(TransitSearchRequestDTO request) {
         try {
@@ -32,6 +36,17 @@ public class TransitSearchService {
                 .time(request.getTime())
                 .resultsReturned(results.size())
                 .build());
+
+            if (!results.isEmpty()) {
+                List<TransitSearchResultEntity> resultEntities = results.stream()
+                        .map(route -> TransitSearchResultEntity.builder()
+                                .transitType(normalizeValue(route.getType()))
+                                .lineNumber(normalizeValue(route.getLineNumber()))
+                                .lineName(normalizeValue(route.getLineName()))
+                                .build())
+                        .toList();
+                searchResultRepository.saveAll(resultEntities);
+            }
 
             log.info("Transit search log saved successfully");
             return results;
@@ -49,5 +64,18 @@ public class TransitSearchService {
             log.error("Transit status fetch failed: {}", e.getMessage());
             return Collections.emptyList();
         }
+    }
+
+    private String normalizeValue(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = value.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+
+        return normalized.toUpperCase(Locale.ROOT);
     }
 }
