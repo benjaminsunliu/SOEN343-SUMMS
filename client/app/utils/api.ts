@@ -299,6 +299,34 @@ export async function fetchParkingSummary(): Promise<ParkingSummary> {
   return res.json();
 }
 
+export async function listActiveParkingFacilities(): Promise<ParkingFacility[]> {
+  const res = await apiFetch("/api/parking/facilities");
+  if (res.ok) {
+    return res.json();
+  }
+
+  // Compatibility fallback for older servers that don't yet expose /api/parking/facilities.
+  if (res.status === 404 || res.status === 405) {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    return searchParking({
+      destination: "Montreal",
+      city: "Montreal",
+      arrivalDate: date,
+      arrivalTime: time,
+      durationHours: 1,
+      vehicleType: "ANY",
+      maxPricePerHour: 9999,
+    });
+  }
+
+  {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message ?? "Unable to load parking facilities");
+  }
+}
+
 //Transit types
 
 export interface TransitSearchParams {

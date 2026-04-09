@@ -44,6 +44,12 @@ public class ParkingFacilityService {
                 .toList();
     }
 
+    public List<ParkingFacilityDTO> getAllActiveFacilities() {
+        return parkingFacilityRepository.findByActiveTrue().stream()
+                .map(this::toDto)
+                .toList();
+    }
+
     public List<ParkingCatalogEntryDto> getCatalogEntriesWithStatus(Long providerId) {
         Map<String, CsvFacilityAccumulator> catalog = readBundledCatalog();
         if (catalog.isEmpty()) {

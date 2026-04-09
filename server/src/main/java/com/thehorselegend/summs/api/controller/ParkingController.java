@@ -72,6 +72,12 @@ public class ParkingController {
         return ResponseEntity.ok(parkingFacilityService.getSummary());
     }
 
+    @GetMapping("/facilities")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<ParkingFacilityDTO>> listActiveFacilities() {
+        return ResponseEntity.ok(parkingFacilityService.getAllActiveFacilities());
+    }
+
     @GetMapping("/management/spaces")
     @PreAuthorize("hasAnyRole('CITY_PROVIDER', 'ADMIN')")
     public ResponseEntity<List<ParkingFacilityDTO>> listParkingSpaces(Authentication authentication) {

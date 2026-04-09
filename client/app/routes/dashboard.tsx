@@ -4,7 +4,9 @@ import { useNavigate } from "react-router";
 import {
   apiFetch,
   fetchParkingSummary,
+  listActiveParkingFacilities,
   listParkingReservations,
+  type ParkingFacility,
   type ParkingSummary,
   type ParkingReservationResponse,
 } from "../utils/api";
@@ -63,6 +65,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const authUser = useMemo(() => getAuthUser(), []);
   const [availableVehicles, setAvailableVehicles] = useState<VehicleResponse[]>([]);
+  const [availableParkingFacilities, setAvailableParkingFacilities] = useState<ParkingFacility[]>([]);
   const [activeReservations, setActiveReservations] = useState<number | null>(null);
   const [reservations, setReservations] = useState<BookingSummary[]>([]);
   const [activeTrip, setActiveTrip] = useState<ActiveTripSummary | null>(null);
@@ -89,10 +92,12 @@ export default function DashboardPage() {
   const [isLoadingCo2, setIsLoadingCo2] = useState(false);
 
   useEffect(() => {
-    // Fetch vehicles
+    // Fetch live map data (vehicles + parking spots)
     let isMounted = true;
 
-    async function loadAvailableVehicles() {
+    async function loadMapData() {
+      let hasFailure = false;
+
       try {
         const response = await apiFetch("/api/vehicles/status/AVAILABLE");
         if (!response.ok) {
@@ -103,20 +108,33 @@ export default function DashboardPage() {
         if (!isMounted) return;
 
         setAvailableVehicles(vehicles);
-        setMapError(null);
       } catch {
+        hasFailure = true;
         if (isMounted) {
-          setMapError("Unable to load live vehicle coordinates.");
           setAvailableVehicles([]);
         }
-      } finally {
-        if (isMounted) {
-          setIsLoadingMap(false);
+      }
+
+      try {
+        const facilities = await listActiveParkingFacilities();
+        if (!isMounted) {
+          return;
         }
+        setAvailableParkingFacilities(facilities);
+      } catch {
+        hasFailure = true;
+        if (isMounted) {
+          setAvailableParkingFacilities([]);
+        }
+      }
+
+      if (isMounted) {
+        setMapError(hasFailure ? "Some live map data could not be loaded." : null);
+        setIsLoadingMap(false);
       }
     }
 
-    void loadAvailableVehicles();
+    void loadMapData();
 
     return () => {
       isMounted = false;
@@ -357,6 +375,19 @@ export default function DashboardPage() {
         kind: markerKindForVehicleType(vehicle.type),
       }));
 
+    const parkingMarkers = availableParkingFacilities
+      .filter(
+        (facility) =>
+          facility.availableSpots > 0 &&
+          typeof facility.latitude === "number" &&
+          typeof facility.longitude === "number",
+      )
+      .map((facility) => ({
+        position: [facility.latitude as number, facility.longitude as number] as [number, number],
+        label: `${facility.name} - ${facility.availableSpots}/${facility.totalSpots} spots available`,
+        kind: "parking" as const,
+      }));
+
     if (hasPreciseUserLocation && userLocation) {
       return [
         {
@@ -368,11 +399,23 @@ export default function DashboardPage() {
           kind: "user",
         },
         ...vehicleMarkers,
+        ...parkingMarkers,
       ];
     }
 
-    return vehicleMarkers;
-  }, [availableVehicles, hasPreciseUserLocation, userLocation]);
+    return [...vehicleMarkers, ...parkingMarkers];
+  }, [availableVehicles, availableParkingFacilities, hasPreciseUserLocation, userLocation]);
+
+  const availableParkingMarkerCount = useMemo(
+    () =>
+      availableParkingFacilities.filter(
+        (facility) =>
+          facility.availableSpots > 0 &&
+          typeof facility.latitude === "number" &&
+          typeof facility.longitude === "number",
+      ).length,
+    [availableParkingFacilities],
+  );
 
   const vehiclesByType = useMemo(() => {
     const counts = { bicycles: 0, cars: 0, scooters: 0 };
@@ -501,6 +544,7 @@ export default function DashboardPage() {
                  <span className="rounded-md bg-black px-3 py-1 text-cyan-400">Bicycle: {vehiclesByType.bicycles}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-blue-500">Car: {vehiclesByType.cars}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-red-400">Scooter: {vehiclesByType.scooters}</span>
+                 <span className="rounded-md bg-black px-3 py-1 text-orange-400">Parking: {availableParkingMarkerCount}</span>
                  <span className="rounded-md bg-black px-3 py-1 text-gray-300">Available: {availableVehicles.length}</span>
                </div>
              </div>
