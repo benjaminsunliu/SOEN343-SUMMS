@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 @Service
-public class VehicleReservationService extends ReservationCreationTemplate<Vehicle, VehicleReservation> {
+public class VehicleReservationService extends ReservationCreationTemplate<VehicleReservationService.VehicleReservationSource, VehicleReservation> {
 
     private final VehicleRepository vehicleRepository;
     private final ReservationRepository reservationRepository;
@@ -35,9 +35,11 @@ public class VehicleReservationService extends ReservationCreationTemplate<Vehic
 
     @Override
     protected void validateAvailability(
-            Vehicle vehicle,
+            VehicleReservationSource source,
             LocalDateTime start,
             LocalDateTime end) {
+        Vehicle vehicle = source.vehicle();
+
         if (!vehicle.isAvailable()) {
             throw new IllegalStateException("Vehicle is not available for reservation");
         }
@@ -49,6 +51,7 @@ public class VehicleReservationService extends ReservationCreationTemplate<Vehic
         if (!start.isBefore(end)) {
             throw new IllegalArgumentException("Start date must be before end date");
         }
+
         boolean hasConflict = reservationRepository.findByReservableId(vehicle.getId()).stream()
                 .map(ReservationMapper::toDomain)
                 .filter(reservation -> reservation instanceof VehicleReservation)
@@ -66,19 +69,24 @@ public class VehicleReservationService extends ReservationCreationTemplate<Vehic
 
     @Override
     protected VehicleReservation buildReservation(
-            Vehicle vehicle,
+            VehicleReservationSource source,
             Long userId,
             LocalDateTime start,
             LocalDateTime end) {
-        return new VehicleReservation(
+        Vehicle vehicle = source.vehicle();
+
+        VehicleReservation reservation = new VehicleReservation(
                 userId,
                 vehicle.getId(),
                 start,
                 end,
-                "CITY",
+                source.city(),
                 vehicle.getLocation(),
-                vehicle.getLocation()
+                source.endLocation()
         );
+
+        reservation.confirm();
+        return reservation;
     }
 
     @Override
@@ -110,22 +118,12 @@ public class VehicleReservationService extends ReservationCreationTemplate<Vehic
                 .map(VehicleMapper::toDomain)
                 .orElseThrow(() -> new IllegalArgumentException("Vehicle not found"));
 
-        validateAvailability(vehicle, startDate, endDate);
-
-        Location startLocation = vehicle.getLocation();
-
-        VehicleReservation reservation = new VehicleReservation(
+        return createReservation(
+                new VehicleReservationSource(vehicle, city, endLocation),
                 userId,
-                vehicleId,
                 startDate,
-                endDate,
-                city,
-                startLocation,
-                endLocation
+                endDate
         );
-
-        reservation.confirm();
-        return saveReservation(reservation);
     }
 
     @Transactional
@@ -249,4 +247,13 @@ public class VehicleReservationService extends ReservationCreationTemplate<Vehic
         }
         throw new IllegalArgumentException("Vehicle reservation not found");
     }
+
+    private record VehicleReservationSource(
+            Vehicle vehicle,
+            String city,
+            Location endLocation
+    ) {
+    }
 }
+
+
