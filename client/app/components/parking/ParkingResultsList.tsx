@@ -1,4 +1,5 @@
 import type { ParkingFacility, ParkingSearchParams } from "../../utils/api";
+import type { GeoLocation } from "../../utils/location";
 import ParkingFacilityCard from "./ParkingFacilityCard";
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
   destination: string;
   durationHours: number;
   searchParams: ParkingSearchParams | null;
+  userLocation: GeoLocation | null;
 }
 
 function SkeletonCard() {
@@ -35,8 +37,14 @@ function SkeletonCard() {
 }
 
 export default function ParkingResultsList({
-  results, loading, error, searched, destination, durationHours, searchParams,
+  results, loading, error, searched, destination, durationHours, searchParams, userLocation,
 }: Props) {
+  const sortedResults = results
+    .map((facility) => ({
+      facility,
+      userDistanceKm: distanceKmFromUser(facility, userLocation),
+    }))
+    .sort((left, right) => compareDistances(left.userDistanceKm, right.userDistanceKm));
 
   // 1 — Not yet searched
   if (!searched && !loading) {
@@ -82,19 +90,87 @@ export default function ParkingResultsList({
   return (
     <div>
       <p className="text-gray-400 text-sm mb-3">
-        <span className="text-white font-semibold">{results.length} parking lots</span>
+        <span className="text-white font-semibold">{sortedResults.length} parking lots</span>
         {destination && <> near <span className="text-white">{destination}</span></>}
       </p>
       <div className="flex flex-col gap-3">
-        {results.map((facility) => (
+        {sortedResults.map(({ facility, userDistanceKm }) => (
           <ParkingFacilityCard
             key={facility.facilityId}
             facility={facility}
             durationHours={durationHours}
             searchParams={searchParams}
+            userDistanceKm={userDistanceKm}
           />
         ))}
       </div>
     </div>
   );
+}
+
+function distanceKmFromUser(
+  facility: ParkingFacility,
+  userLocation: GeoLocation | null,
+): number | null {
+  if (!userLocation || !hasCoordinates(facility)) {
+    return null;
+  }
+
+  const distanceKm = haversineDistanceKm(
+    userLocation.latitude,
+    userLocation.longitude,
+    facility.latitude,
+    facility.longitude,
+  );
+
+  if (!Number.isFinite(distanceKm)) {
+    return null;
+  }
+
+  return distanceKm;
+}
+
+function hasCoordinates(
+  facility: ParkingFacility,
+): facility is ParkingFacility & { latitude: number; longitude: number } {
+  return (
+    typeof facility.latitude === "number" &&
+    typeof facility.longitude === "number"
+  );
+}
+
+function compareDistances(left: number | null, right: number | null): number {
+  if (left === null && right === null) {
+    return 0;
+  }
+  if (left === null) {
+    return 1;
+  }
+  if (right === null) {
+    return -1;
+  }
+  return left - right;
+}
+
+function haversineDistanceKm(
+  latitudeOne: number,
+  longitudeOne: number,
+  latitudeTwo: number,
+  longitudeTwo: number,
+): number {
+  const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+
+  const latDiff = toRadians(latitudeTwo - latitudeOne);
+  const lonDiff = toRadians(longitudeTwo - longitudeOne);
+  const latOneRad = toRadians(latitudeOne);
+  const latTwoRad = toRadians(latitudeTwo);
+
+  const a =
+    Math.sin(latDiff / 2) * Math.sin(latDiff / 2) +
+    Math.cos(latOneRad) * Math.cos(latTwoRad) *
+      Math.sin(lonDiff / 2) * Math.sin(lonDiff / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return earthRadiusKm * c;
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router";
 import type { Route } from "./+types/login";
 import { apiUrl } from "../utils/api";
-import { isAuthenticated, persistAuth } from "../utils/auth";
+import { getDefaultDashboardPath, isAuthenticated, persistAuth } from "../utils/auth";
 
 interface AuthResponsePayload {
   id: number;
@@ -30,7 +30,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      navigate("/dashboard", { replace: true });
+      navigate(getDefaultDashboardPath(), { replace: true });
       return;
     }
 
@@ -43,7 +43,7 @@ export default function LoginPage() {
       "from" in location.state &&
       typeof location.state.from === "string"
       ? location.state.from
-      : "/dashboard";
+      : null;
 
   const validate = () => {
     let message: string | null = null;
@@ -89,7 +89,10 @@ export default function LoginPage() {
         role: data.role,
         token: data.token,
       });
-      navigate(redirectPath, { replace: true });
+
+      const normalizedRole = data.role.trim().toUpperCase();
+      const roleDefaultPath = normalizedRole === "CITY_PROVIDER" ? "/city/dashboard" : "/dashboard";
+      navigate(redirectPath ?? roleDefaultPath, { replace: true });
     } catch {
       setError("Network error. Please check your connection and try again.");
     }

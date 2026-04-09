@@ -21,7 +21,11 @@ import java.util.Map;
 @Service
 public class AuthService {
 
-    private static final EnumSet<UserRole> SELF_REGISTRABLE_ROLES = EnumSet.of(UserRole.CITIZEN, UserRole.PROVIDER);
+        private static final EnumSet<UserRole> SELF_REGISTRABLE_ROLES = EnumSet.of(
+            UserRole.CITIZEN,
+            UserRole.PROVIDER,
+            UserRole.CITY_PROVIDER);
+    private static final UserRole ADMIN_CREATABLE_ROLE = UserRole.CITY_PROVIDER;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -86,6 +90,33 @@ public class AuthService {
                 user.getRole().name(),
                 "Login successful",
                 jwtService.generateToken(user));
+    }
+
+    public AuthResponse createCityProviderAccount(String name, String email, String password) {
+        String normalizedEmail = email.trim().toLowerCase();
+
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new IllegalArgumentException("Email already in use.");
+        }
+
+        UserRegistrationStrategy strategy = resolveStrategy(ADMIN_CREATABLE_ROLE);
+        String hashedPassword = passwordEncoder.encode(password);
+
+        User user = strategy.create(
+                name.trim(),
+                normalizedEmail,
+                hashedPassword);
+
+        UserEntity savedEntity = userRepository.save(UserMapper.toEntity(user));
+        User savedUser = UserMapper.toDomain(savedEntity);
+
+        return new AuthResponse(
+                savedUser.getId(),
+                savedUser.getName(),
+                savedUser.getEmail(),
+                savedUser.getRole().name(),
+                "City provider account created",
+                jwtService.generateToken(savedUser));
     }
 
     private UserRole resolveRequestedRole(UserRole requestedRole) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
-import { hasAnyRole, type AuthRole, isAuthenticated } from "../utils/auth";
+import { getDefaultDashboardPath, hasAnyRole, type AuthRole, isAuthenticated } from "../utils/auth";
 import { SiteNav } from "../root";
 
 interface RouteRoleRule {
@@ -9,8 +9,10 @@ interface RouteRoleRule {
 }
 
 const routeRoleRules: RouteRoleRule[] = [
+  { pattern: /^\/provider\/parking(\/|$)/, roles: ["ADMIN"] },
   { pattern: /^\/provider(\/|$)/, roles: ["PROVIDER", "ADMIN"] },
   { pattern: /^\/analytics(\/|$)/, roles: ["PROVIDER", "ADMIN"] },
+  { pattern: /^\/city(\/|$)/, roles: ["CITY_PROVIDER", "ADMIN"] },
 ];
 
 function isRouteAuthorized(pathname: string): boolean {
@@ -34,7 +36,7 @@ export default function ProtectedLayout() {
     }
 
     if (!isRouteAuthorized(location.pathname)) {
-      navigate("/dashboard", { replace: true });
+      navigate(getDefaultDashboardPath(), { replace: true });
       return;
     }
 

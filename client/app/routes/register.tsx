@@ -9,7 +9,7 @@ interface RegistrationFormData {
   email: string;
   password: string;
   confirmPassword: string;
-  role: "CITIZEN" | "PROVIDER";
+  role: "CITIZEN" | "PROVIDER" | "CITY_PROVIDER";
 }
 
 interface FormErrors {
@@ -227,6 +227,22 @@ export default function Register() {
                   <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.22.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm11 0c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" />
                 </svg>
                 Provider
+              </button>
+              <button
+                type="button"
+                onClick={() => handleChange({
+                  target: { name: "role", value: "CITY_PROVIDER" },
+                } as any)}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition ${
+                  formData.role === "CITY_PROVIDER"
+                    ? "bg-cyan-600 text-white"
+                    : "border border-gray-600 text-gray-400 hover:text-white hover:border-gray-500"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M3 5h18v3H3V5zm2 5h14v9H5v-9zm3 2v5h2v-5H8zm6 0v5h2v-5h-2z" />
+                </svg>
+                City Provider
               </button>
             </div>
           </div>

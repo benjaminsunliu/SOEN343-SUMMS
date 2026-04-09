@@ -21,6 +21,7 @@ import java.util.List;
 public class ParkingReservationController {
     private static final String RESERVATION_NOT_FOUND_MESSAGE = "Parking reservation not found";
     private static final String CANCEL_NOT_AUTHORIZED_MESSAGE = "User not authorized to cancel this parking reservation";
+    private static final String MODIFY_NOT_AUTHORIZED_MESSAGE = "User not authorized to modify this parking reservation";
     private static final String ALREADY_CANCELLED_MESSAGE = "Parking reservation is already cancelled";
 
     private final ParkingReservationService reservationService;
@@ -72,6 +73,36 @@ public class ParkingReservationController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * POST /api/parking/reservations/{reservationId}/occupy
+     * Marks a confirmed parking reservation as active for the authenticated user.
+     */
+    @PostMapping("/reservations/{reservationId}/occupy")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ParkingReservationResponse> occupyParkingReservation(
+            @PathVariable Long reservationId,
+            Authentication authentication
+    ) {
+        Long userId = resolveAuthenticatedUserId(authentication);
+        return ResponseEntity.ok(updateReservationStatus(() ->
+                reservationService.occupyReservation(reservationId, userId)));
+    }
+
+    /**
+     * POST /api/parking/reservations/{reservationId}/checkout
+     * Marks an active parking reservation as completed for the authenticated user.
+     */
+    @PostMapping("/reservations/{reservationId}/checkout")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ParkingReservationResponse> checkoutParkingReservation(
+            @PathVariable Long reservationId,
+            Authentication authentication
+    ) {
+        Long userId = resolveAuthenticatedUserId(authentication);
+        return ResponseEntity.ok(updateReservationStatus(() ->
+                reservationService.checkoutReservation(reservationId, userId)));
+    }
+
     private Long resolveAuthenticatedUserId(Authentication authentication) {
         if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Authentication required");
@@ -104,5 +135,26 @@ public class ParkingReservationController {
             }
             throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
         }
+    }
+
+    private ParkingReservationResponse updateReservationStatus(ReservationStatusAction action) {
+        try {
+            return action.execute();
+        } catch (IllegalArgumentException ex) {
+            if (RESERVATION_NOT_FOUND_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage(), ex);
+        } catch (IllegalStateException ex) {
+            if (MODIFY_NOT_AUTHORIZED_MESSAGE.equals(ex.getMessage())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, ex.getMessage(), ex);
+            }
+            throw new ResponseStatusException(HttpStatus.CONFLICT, ex.getMessage(), ex);
+        }
+    }
+
+    @FunctionalInterface
+    private interface ReservationStatusAction {
+        ParkingReservationResponse execute();
     }
 }
