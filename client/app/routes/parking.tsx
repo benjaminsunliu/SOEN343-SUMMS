@@ -1,10 +1,12 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Route } from "./+types/parking";
 import {
+  listActiveParkingFacilities,
   searchParking,
   type ParkingFacility,
   type ParkingSearchParams,
 } from "../utils/api";
+import { getBrowserLocation, type GeoLocation } from "../utils/location";
 import ParkingSearchForm from "../components/parking/ParkingSearchForm";
 import ParkingResultsList from "../components/parking/ParkingResultsList";
 
@@ -27,7 +29,32 @@ function useParkingSearch() {
   const [duration, setDuration] = useState(6);
   const [searchParams, setSearchParams] = useState<ParkingSearchParams | null>(null);
 
+  const loadAvailableProviderInventory = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setSearched(true);
+    setDest("");
+    setDuration(6);
+    setSearchParams(null);
+
+    try {
+      const data = await listActiveParkingFacilities();
+      setResults(data.filter((facility) => facility.availableSpots > 0));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Parking service unavailable.";
+      setError(msg);
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const search = useCallback(async (params: ParkingSearchParams) => {
+    if (!params.destination.trim()) {
+      await loadAvailableProviderInventory();
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSearched(true);
@@ -45,23 +72,48 @@ function useParkingSearch() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadAvailableProviderInventory]);
 
   const reset = useCallback(() => {
-    setResults([]);
-    setSearched(false);
-    setError(null);
-    setDest("");
-    setDuration(6);
-    setSearchParams(null);
-  }, []);
+    void loadAvailableProviderInventory();
+  }, [loadAvailableProviderInventory]);
+
+  useEffect(() => {
+    void loadAvailableProviderInventory();
+  }, [loadAvailableProviderInventory]);
 
   return { results, loading, error, searched, destination, duration, searchParams, search, reset };
 }
 
 export default function ParkingPage() {
+  const [userLocation, setUserLocation] = useState<GeoLocation | null>(null);
   const { results, loading, error, searched, destination, duration, searchParams, search, reset } =
     useParkingSearch();
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function locateUser() {
+      try {
+        const location = await getBrowserLocation();
+        if (!isMounted) {
+          return;
+        }
+        setUserLocation(location);
+      } catch {
+        if (!isMounted) {
+          return;
+        }
+        setUserLocation(null);
+      }
+    }
+
+    void locateUser();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 px-5 py-4 text-white">
@@ -83,6 +135,7 @@ export default function ParkingPage() {
             destination={destination}
             durationHours={duration}
             searchParams={searchParams}
+            userLocation={userLocation}
           />
         </main>
       </div>

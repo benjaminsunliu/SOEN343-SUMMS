@@ -5,9 +5,10 @@ interface Props {
   facility: ParkingFacility;
   durationHours: number;
   searchParams: ParkingSearchParams | null;
+  userDistanceKm: number | null;
 }
 
-export default function ParkingFacilityCard({ facility, durationHours, searchParams }: Props) {
+export default function ParkingFacilityCard({ facility, durationHours, searchParams, userDistanceKm }: Props) {
   const navigate = useNavigate();
 
   const isAlmostFull = facility.availabilityStatus === "ALMOST_FULL";
@@ -69,7 +70,7 @@ export default function ParkingFacilityCard({ facility, durationHours, searchPar
 
       <div className="flex flex-wrap gap-1.5 mb-3">
         <span className="text-xs px-2.5 py-0.5 rounded-full border border-gray-600 text-gray-400">
-          {facility.distanceKm?.toFixed(1)} km away
+          {formatDistance(userDistanceKm)}
         </span>
         {facility.amenityTags?.map((tag) => (
           <span
@@ -115,4 +116,16 @@ export default function ParkingFacilityCard({ facility, durationHours, searchPar
       </div>
     </div>
   );
+}
+
+function formatDistance(distanceKm: number | null): string {
+  if (distanceKm === null || !Number.isFinite(distanceKm)) {
+    return "Distance unavailable";
+  }
+
+  if (distanceKm < 1) {
+    return `${Math.max(1, Math.round(distanceKm * 1000))} m away`;
+  }
+
+  return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km away`;
 }
