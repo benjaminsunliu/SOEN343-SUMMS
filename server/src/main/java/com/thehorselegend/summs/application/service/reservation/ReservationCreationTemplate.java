@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 public abstract class ReservationCreationTemplate<T, R extends Reservation> {
 
-    public final R createReservation(
+    public R createReservation(
             T source,
             Long userId,
             LocalDateTime startDate,

@@ -1,14 +1,13 @@
 package com.thehorselegend.summs.infrastructure.persistence;
 
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Entity;
+import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@DiscriminatorValue("PARKING")
+@Table(name = "parking_reservations")
+@PrimaryKeyJoinColumn(name = "reservation_id")
 public class ParkingReservationEntity extends ReservationEntity {
 
     @Column(name = "facility_name")

@@ -16,8 +16,7 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_reservations_status_end_date", columnList = "status,end_date")
         }
 )
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "reservation_type", discriminatorType = DiscriminatorType.STRING)
+@Inheritance(strategy = InheritanceType.JOINED)
 public abstract class ReservationEntity {
 
     @Id

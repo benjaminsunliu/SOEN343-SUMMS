@@ -1,17 +1,13 @@
 package com.thehorselegend.summs.infrastructure.persistence;
 
 import com.thehorselegend.summs.domain.reservation.ReservationStatus;
-import jakarta.persistence.AttributeOverride;
-import jakarta.persistence.AttributeOverrides;
-import jakarta.persistence.Column;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Embedded;
-import jakarta.persistence.Entity;
+import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
 
 @Entity
-@DiscriminatorValue("VEHICLE")
+@Table(name = "vehicle_reservations")
+@PrimaryKeyJoinColumn(name = "reservation_id")
 public class VehicleReservationEntity extends ReservationEntity {
 
     @Embedded
